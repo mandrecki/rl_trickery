@@ -1,0 +1,8 @@
+README.md
+setup.py
+RL_trickery.egg-info/PKG-INFO
+RL_trickery.egg-info/SOURCES.txt
+RL_trickery.egg-info/dependency_links.txt
+RL_trickery.egg-info/requires.txt
+RL_trickery.egg-info/top_level.txt
+rl_trickery/__init__.py
