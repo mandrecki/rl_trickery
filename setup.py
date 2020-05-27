@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(
-    name='RL_trickery',
+    name='rl_trickery',
     version='0.1dev',
     packages=['rl_trickery'],
     author="Marian Andrecki",

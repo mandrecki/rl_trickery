@@ -39,15 +39,14 @@ IM_SIZE = 64
 
 def make_env(
         env_id,
-        *extra_args,
+        env_args,
         seed=0,
-        max_episode_length=200,
         pytorch_dim_order=True,
         target_size=(IM_SIZE, IM_SIZE),
         augment=False
 ):
     if "Mazelab" in env_id:
-        env = gym.make(env_id)
+        env = gym.make(env_id, *env_args)
     elif env_id in GYM_ENVS:
         env = gym.make(env_id)
         env = ToImageObservation(env)
