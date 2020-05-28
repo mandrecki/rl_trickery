@@ -1,0 +1,238 @@
+import copy
+import math
+import os
+import pickle as pkl
+import sys
+import time
+
+import numpy as np
+from collections import deque
+
+import hydra
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from a2c_ppo_acktr.model import Policy
+from a2c_ppo_acktr.algo import PPO, A2C_ACKTR
+from a2c_ppo_acktr.storage import RolloutStorage
+
+
+import rl_trickery.envs
+import rl_trickery.utils.utils as utils
+from rl_trickery.utils.logger import Logger
+from rl_trickery.utils.video import VideoRecorder
+
+
+torch.backends.cudnn.benchmark = True
+
+from rl_trickery.envs import make_envs
+
+
+class Workspace(object):
+    def __init__(self, cfg):
+        self.work_dir = os.getcwd()
+        print(f'workspace: {self.work_dir}')
+
+        self.cfg = cfg
+
+        self.logger = Logger(self.work_dir,
+                             save_tb=cfg.log_save_tb,
+                             log_frequency=cfg.log_frequency_step,
+                             agent=cfg.agent.name)
+
+        utils.set_seed_everywhere(cfg.seed)
+        self.device = torch.device(cfg.device)
+
+        self.env = make_envs(
+            **cfg.env,
+            seed=cfg.seed
+        )
+
+        self.net = Policy(
+            self.env.observation_space.shape,
+            self.env.action_space,
+            base_kwargs={'recurrent': cfg.agent.recurrent_policy})
+        self.net.to(self.device)
+
+        if cfg.agent.name == 'a2c':
+            self.agent = A2C_ACKTR(
+                self.net,
+                cfg.agent.value_loss_coef,
+                cfg.agent.entropy_coef,
+                lr=cfg.agent.lr,
+                eps=cfg.agent.eps,
+                alpha=cfg.agent.alpha,
+                max_grad_norm=cfg.agent.max_grad_norm)
+        elif cfg.agent.name == 'ppo':
+            self.agent = PPO(
+                self.net,
+                cfg.agent.clip_param,
+                cfg.agent.ppo_epoch,
+                cfg.agent.num_mini_batch,
+                cfg.agent.value_loss_coef,
+                cfg.agent.entropy_coef,
+                lr=cfg.agent.lr,
+                eps=cfg.agent.eps,
+                max_grad_norm=cfg.agent.max_grad_norm)
+
+        self.rollouts = RolloutStorage(
+            cfg.agent.num_steps,
+            cfg.env.num_envs,
+            self.env.observation_space.shape,
+            self.env.action_space,
+            self.net.recurrent_hidden_state_size
+        )
+        self.rollouts.to(self.device)
+
+        self.video_recorder = VideoRecorder(
+            self.work_dir if cfg.save_video else None)
+        self.step = 0
+
+    def evaluate_old(self):
+        average_episode_reward = 0
+        for episode in range(self.cfg.num_eval_episodes):
+            obs = self.env.reset()
+            self.video_recorder.init(enabled=(episode == 0))
+            done = False
+            episode_reward = 0
+            episode_step = 0
+            while not done:
+                with torch.no_grad():
+                    action = self.agent.act(obs, sample=False)
+                obs, reward, done, info = self.env.step(action[0][0])
+                self.video_recorder.record(self.env)
+                episode_reward += reward
+                episode_step += 1
+
+            average_episode_reward += episode_reward
+            self.video_recorder.save(f'{self.step}.mp4')
+        average_episode_reward /= self.cfg.num_eval_episodes
+        self.logger.log('eval/episode_reward', average_episode_reward,
+                        self.step)
+        self.logger.dump(self.step)
+
+    def evaluate(self):
+        eval_envs = make_envs(
+            **self.cfg.env,
+            seed=self.cfg.seed,
+        )
+        eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
+
+        obs = eval_envs.reset()
+        eval_recurrent_hidden_states = torch.zeros(
+            self.cfg.env.num_envs, self.net.recurrent_hidden_state_size, device=self.device
+        )
+        eval_masks = torch.zeros(self.cfg.env.num_envs, 1, device=self.device)
+
+        while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
+            with torch.no_grad():
+                _, action, _, eval_recurrent_hidden_states = self.net.act(
+                    obs,
+                    eval_recurrent_hidden_states,
+                    eval_masks,
+                    deterministic=True
+                )
+
+            # Obser reward and next obs
+            obs, _, done, infos = eval_envs.step(action)
+
+            eval_masks = torch.tensor(
+                [[0.0] if done_ else [1.0] for done_ in done],
+                dtype=torch.float32,
+                device=self.device)
+
+            for info in infos:
+                if 'episode' in info.keys():
+                    eval_episode_rewards.append(info['episode']['r'])
+
+        eval_envs.close()
+        print(
+            """Last {} eval episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
+                .format(
+                len(eval_episode_rewards), np.mean(eval_episode_rewards),
+                np.median(eval_episode_rewards),
+                np.min(eval_episode_rewards), np.max(eval_episode_rewards),
+            )
+        )
+
+
+        return eval_episode_rewards
+
+    def run(self):
+        obs = self.env.reset()
+        self.rollouts.obs[0].copy_(obs)
+
+        episode_rewards = deque(maxlen=30)
+
+        start_time = time.time()
+
+        num_updates = int(self.cfg.num_train_steps) // self.cfg.agent.num_steps // self.cfg.env.num_envs
+        for j in range(num_updates):
+            for step in range(self.cfg.agent.num_steps):
+                # Sample actions
+                with torch.no_grad():
+                    value, action, action_log_prob, recurrent_hidden_states = self.net.act(
+                        self.rollouts.obs[step],
+                        self.rollouts.recurrent_hidden_states[step],
+                        self.rollouts.masks[step]
+                    )
+
+                # Obser reward and next obs
+                obs, reward, done, infos = self.env.step(action)
+
+                for info in infos:
+                    if 'episode' in info.keys():
+                        episode_rewards.append(info['episode']['r'])
+
+                # If done then clean the history of observations.
+                masks = torch.FloatTensor(
+                    [[0.0] if done_ else [1.0] for done_ in done]
+                )
+                bad_masks = torch.FloatTensor(
+                    [[0.0] if 'bad_transition' in info.keys() else [1.0]
+                     for info in infos]
+                )
+                self.rollouts.insert(obs, recurrent_hidden_states, action,
+                                action_log_prob, value, reward, masks, bad_masks)
+
+            with torch.no_grad():
+                next_value = self.net.get_value(
+                    self.rollouts.obs[-1], self.rollouts.recurrent_hidden_states[-1],
+                    self.rollouts.masks[-1]).detach()
+
+            self.rollouts.compute_returns(next_value, self.cfg.agent.use_gae, self.cfg.agent.gamma,
+                                     self.cfg.agent.gae_lambda, self.cfg.agent.use_proper_time_limits)
+
+            value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
+
+            self.rollouts.after_update()
+
+            if j % self.cfg.log_frequency_step == 0 and len(episode_rewards) > 1:
+                total_num_steps = (j + 1) * self.cfg.env.num_envs * self.cfg.agent.num_steps
+                end_time = time.time()
+                print(
+                    """Updates {}, num timesteps {}, FPS {}\n"""
+                    """Last {} training episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
+                    """entropy: {:.2f} value loss: {:.3f} action loss {:.3f}\n"""
+                    .format(
+                        j, total_num_steps,
+                        int(total_num_steps / (end_time - start_time)),
+                        len(episode_rewards), np.mean(episode_rewards),
+                        np.median(episode_rewards), np.min(episode_rewards),
+                        np.max(episode_rewards),
+                        dist_entropy, value_loss, action_loss
+                    )
+                )
+            if j % self.cfg.eval_frequency_step == 0:
+                self.evaluate()
+
+
+@hydra.main(config_path='config.yaml', strict=True)
+def main(cfg):
+    workspace = Workspace(cfg)
+    workspace.run()
+
+
+if __name__ == '__main__':
+    main()

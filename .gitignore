@@ -12,6 +12,9 @@
 */.pydevproject
 */.idea
 
+# virtual env
+venv
+
 # IPython notebook related#
 **/.ipynb_checkpoints/**
 

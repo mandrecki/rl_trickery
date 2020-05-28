@@ -39,16 +39,14 @@ IM_SIZE = 64
 
 def make_env(
         env_id,
-        env_args,
+        env_args=[],
         seed=0,
         pytorch_dim_order=True,
-        target_size=(IM_SIZE, IM_SIZE),
+        image_size=84,
         augment=False
 ):
-    if "Mazelab" in env_id:
-        env = gym.make(env_id, *env_args)
-    elif env_id in GYM_ENVS:
-        env = gym.make(env_id)
+    env = gym.make(env_id, *env_args)
+    if env_id in GYM_ENVS:
         env = ToImageObservation(env)
     elif env_id in DMC2_ENVS:
         import dmc2gym
@@ -60,19 +58,18 @@ def make_env(
             seed=seed,
             visualize_reward=False,
             from_pixels=True,
-            height=IM_SIZE,
-            width=IM_SIZE,
+            height=image_size,
+            width=image_size,
             frame_skip=CONTROL_SUITE_ACTION_REPEATS[domain_name],
             camera_id=camera_id,
             channels_first=False
         )
 
-    else:
-        raise ValueError("Bad env_id", env_id)
-
     # Crop and resize if necessary
     if env_id in CROP_ENVS.keys():
         env = CropImage(env, CROP_ENVS.get(env_id))
+
+    target_size = (image_size, image_size)
     if env_id in UPSCALE_ENVS:
         env = ResizeImage(env, target_size, antialias=True)
     elif env.observation_space.shape[0:2] != target_size:
@@ -90,16 +87,16 @@ def make_env(
     return env
 
 
-def env_generator(env_id, seed=0, target_size=(IM_SIZE, IM_SIZE), **kwargs):
+def env_generator(env_id, seed=0, **kwargs):
     def _thunk():
-        env = make_env(env_id, seed=seed, pytorch_dim_order=True, target_size=target_size, **kwargs)
+        env = make_env(env_id, seed=seed, **kwargs)
         return env
 
     return _thunk
 
 
-def make_envs(env_id, seed, n_envs, device, frame_stack=1):
-    envs = [env_generator(env_id, seed=seed + 1000 * i) for i in range(n_envs)]
+def make_envs(env_id, device, seed=0, num_envs=1, frame_stack=1, **kwargs):
+    envs = [env_generator(env_id, seed=seed + 1000 * i, **kwargs) for i in range(num_envs)]
 
     if len(envs) > 1:
         envs = SubprocVecEnv(envs)

@@ -1,5 +1,8 @@
 import numpy as np
 
+from gym.spaces import Box
+from gym.spaces import Discrete
+
 from mazelab import BaseEnv
 from mazelab import VonNeumannMotion
 from mazelab import BaseMaze
@@ -15,7 +18,7 @@ class BoardColor:
     goal = (255, 0, 0)
 
 
-def generate(kind, size=8):
+def generate(kind, size=12):
     if kind == "empty":
         return generate_empty(size)
     elif kind == "random":
@@ -106,12 +109,8 @@ class MazelabEnv(BaseEnv):
         if self._is_goal(new_position):
             reward = +1
             done = True
-        # elif not valid:
-        #     reward = -1
-        #     done = False
         else:
             reward = -0.01
-            # reward = 0
             done = False
         return self.maze.to_rgb(), reward, done, {}
 

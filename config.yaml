@@ -1,0 +1,53 @@
+num_train_steps: 1e7
+num_train_iters: 1
+num_seed_steps: 1000
+device: cuda:0
+seed: 1
+
+eval_frequency_step: 10000
+num_eval_episodes: 30
+
+log_frequency_step: 10
+log_save_tb: true
+save_video: true
+
+# global params
+lr: 2.5e-4
+batch_size: 32
+
+env:
+  env_id: Mazelab-v3
+  num_envs: 32
+  image_size: 84
+  pytorch_dim_order: true
+  frame_stack: 1
+  device: ${device}
+
+# agent configuration
+agent:
+  name: ppo
+  num_envs: ${env.num_envs}
+  recurrent_policy: true
+  lr: ${lr}
+  gamma: 0.99
+  value_loss_coef: 0.5
+  entropy_coef: 0.01
+  num_steps: 128
+  num_mini_batch: 32
+  num_env_steps: ${num_env_steps}
+  eps: 1e-5
+  alpha: 0.99
+  max_grad_norm: 0.5
+  clip_param: 0.2
+  ppo_epoch: 4
+  device: ${device}
+
+  use_gae: False
+  gae_lambda: 0.95
+  use_proper_time_limits: False
+
+# hydra configuration
+hydra:
+  name: ${env}
+  run:
+    dir: ~/experiments/runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
