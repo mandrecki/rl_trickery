@@ -28,6 +28,17 @@ class VideoRecorder(object):
             )
             self.frames.append(frame)
 
+    def add_torch_obs(self, obs):
+        frame = obs[0, ...].cpu().numpy().transpose([1, 2, 0]) * 255
+        frame = frame.astype("uint8")
+        self.frames.append(frame)
+
+    def capture(self, obs_seq):
+        frames = np.stack(obs_seq)
+        frames = np.concatenate([frames[:, i, ...] for i in range(frames.shape[1])], axis=0)
+        frames = [frames[i, ...].transpose([1, 2, 0]) for i in range(frames.shape[0])]
+        self.frames = frames
+
     def save(self, file_name):
         if self.enabled:
             path = os.path.join(self.save_dir, file_name)

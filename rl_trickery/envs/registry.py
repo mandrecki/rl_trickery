@@ -1,50 +1,51 @@
 import gym
 from .maze import MazelabEnv
 
+env_name = "Mazelab{}-v{}"
+for size in [8, 12, 16, 32]:
+    gym.envs.register(
+        id=env_name.format(size, 0), entry_point=MazelabEnv, max_episode_steps=200,
+        kwargs={
+            "size":size
+        })
 
-env_id = "Mazelab-v0"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=200,
-    kwargs={
-    })
+    gym.envs.register(
+        id=env_name.format(size, 1), entry_point=MazelabEnv, max_episode_steps=200,
+        kwargs={
+            "kind": "empty",
+            "fixed": True,
+            "size":size
+        })
 
-env_id = "Mazelab-v1"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=200,
-    kwargs={
-        "kind": "empty",
-        "fixed": True,
-    })
+    gym.envs.register(
+        id=env_name.format(size, 2), entry_point=MazelabEnv, max_episode_steps=200,
+        kwargs={
+            "kind": "empty",
+            "fixed": False,
+            "size": size
+        })
 
-env_id = "Mazelab-v2"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=500,
-    kwargs={
-        "kind": "empty",
-        "fixed": False,
-    })
+    gym.envs.register(
+        id=env_name.format(size, 3), entry_point=MazelabEnv, max_episode_steps=500,
+        kwargs={
+            "kind": "random",
+            "fixed": True,
+            "size": size
+        })
 
-env_id = "Mazelab-v3"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=500,
-    kwargs={
-        "kind": "random",
-        "fixed": True,
-    })
+    gym.envs.register(
+        id=env_name.format(size, 4), entry_point=MazelabEnv, max_episode_steps=500,
+        kwargs={
+            "kind": "random",
+            "fixed": False,
+            "variable_goal": True,
+            "size": size
+        })
 
-env_id = "Mazelab-v4"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=500,
-    kwargs={
-        "kind": "random",
-        "fixed": False,
-        "variable_goal": True,
-    })
-
-env_id = "Mazelab-v5"
-gym.envs.register(
-    id=env_id, entry_point=MazelabEnv, max_episode_steps=500,
-    kwargs={
-        "kind": "random",
-        "fixed": False,
-    })
+    gym.envs.register(
+        id=env_name.format(size, 5), entry_point=MazelabEnv, max_episode_steps=500,
+        kwargs={
+            "kind": "random",
+            "fixed": False,
+            "size": size
+        })

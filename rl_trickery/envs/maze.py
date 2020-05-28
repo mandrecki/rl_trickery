@@ -27,12 +27,12 @@ def generate(kind, size=12):
         raise ValueError("Bad maze kind {}".format(kind))
 
 
-def generate_random(size=16):
+def generate_random(size=12):
     x = random_maze(width=size, height=size, complexity=.1, density=.3)
     return x
 
 
-def generate_empty(size=16):
+def generate_empty(size=12):
     x = np.zeros((size, size))
     x[:, 0] = 1
     x[:, -1] = 1
@@ -42,10 +42,10 @@ def generate_empty(size=16):
 
 
 class Maze(BaseMaze):
-    def __init__(self, kind):
+    def __init__(self, kind, size):
         self.start = np.array([[0,0]])
         self.goal = np.array([[0,0]])
-        self.board = generate(kind)
+        self.board = generate(kind, size)
         self.randomize_agent()
         self.randomize_goal()
         super().__init__()
@@ -87,12 +87,13 @@ class MazelabEnv(BaseEnv):
 
         self.kind = kwargs.get("kind")
         self.fixed = kwargs.get("fixed", False)
+        self.size = kwargs.get("size", 12)
         self.variable_goal = kwargs.get("variable_goal", False)
 
         if self.fixed:
             np.random.seed(FIXED_SEED)
 
-        self.maze = Maze(self.kind)
+        self.maze = Maze(self.kind, self.size)
         self.motions = VonNeumannMotion()
 
         self.observation_space = Box(low=0, high=255, shape=list(self.maze.size)+[3], dtype=np.uint8)
@@ -114,9 +115,19 @@ class MazelabEnv(BaseEnv):
             done = False
         return self.maze.to_rgb(), reward, done, {}
 
+    def seed(self, seed=None):
+        s = np.random.seed(seed)
+
+        if hasattr(self, "fixed"):
+            if not self.fixed:
+                self.maze = Maze(self.kind, self.size)
+            elif self.variable_goal:
+                self.maze.randomize_goal()
+        return s
+
     def reset(self):
         if not self.fixed:
-            self.maze = Maze(self.kind)
+            self.maze = Maze(self.kind, self.size)
         elif self.variable_goal:
             self.maze.randomize_goal()
 

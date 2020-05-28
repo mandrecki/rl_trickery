@@ -22,11 +22,10 @@ import rl_trickery.envs
 import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
+from rl_trickery.envs import make_envs
 
 
 torch.backends.cudnn.benchmark = True
-
-from rl_trickery.envs import make_envs
 
 
 class Workspace(object):
@@ -36,10 +35,10 @@ class Workspace(object):
 
         self.cfg = cfg
 
-        self.logger = Logger(self.work_dir,
-                             save_tb=cfg.log_save_tb,
-                             log_frequency=cfg.log_frequency_step,
-                             agent=cfg.agent.name)
+        # self.logger = Logger(self.work_dir,
+        #                      save_tb=cfg.log_save_tb,
+        #                      log_frequency=cfg.log_frequency_step,
+        #                      agent=cfg.agent.name)
 
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
@@ -54,6 +53,7 @@ class Workspace(object):
             self.env.action_space,
             base_kwargs={'recurrent': cfg.agent.recurrent_policy})
         self.net.to(self.device)
+        self.cfg.n_params = utils.get_n_params(self.net)
 
         if cfg.agent.name == 'a2c':
             self.agent = A2C_ACKTR(
@@ -112,7 +112,7 @@ class Workspace(object):
                         self.step)
         self.logger.dump(self.step)
 
-    def evaluate(self):
+    def evaluate(self, step):
         eval_envs = make_envs(
             **self.cfg.env,
             seed=self.cfg.seed,
@@ -125,13 +125,17 @@ class Workspace(object):
         )
         eval_masks = torch.zeros(self.cfg.env.num_envs, 1, device=self.device)
 
+        batched_obs_seq = []
+        self.video_recorder.init()
         while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
+            batched_obs_seq.append((obs.cpu().numpy() * 255).astype("uint8"))
+            # self.video_recorder.add_torch_obs(obs)
             with torch.no_grad():
                 _, action, _, eval_recurrent_hidden_states = self.net.act(
                     obs,
                     eval_recurrent_hidden_states,
                     eval_masks,
-                    deterministic=True
+                    # deterministic=True
                 )
 
             # Obser reward and next obs
@@ -145,6 +149,8 @@ class Workspace(object):
             for info in infos:
                 if 'episode' in info.keys():
                     eval_episode_rewards.append(info['episode']['r'])
+        self.video_recorder.capture(batched_obs_seq)
+        self.video_recorder.save(f'{step}.mp4')
 
         eval_envs.close()
         print(
@@ -156,19 +162,18 @@ class Workspace(object):
             )
         )
 
-
         return eval_episode_rewards
 
     def run(self):
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(obs)
-
         episode_rewards = deque(maxlen=30)
-
-        start_time = time.time()
-
         num_updates = int(self.cfg.num_train_steps) // self.cfg.agent.num_steps // self.cfg.env.num_envs
         for j in range(num_updates):
+            if j % self.cfg.eval_frequency_step == 0:
+                self.evaluate(j)
+
+            last_time = time.time()
             for step in range(self.cfg.agent.num_steps):
                 # Sample actions
                 with torch.no_grad():
@@ -217,15 +222,13 @@ class Workspace(object):
                     """entropy: {:.2f} value loss: {:.3f} action loss {:.3f}\n"""
                     .format(
                         j, total_num_steps,
-                        int(total_num_steps / (end_time - start_time)),
+                        int(self.cfg.env.num_envs * self.cfg.agent.num_steps / (end_time - last_time)),
                         len(episode_rewards), np.mean(episode_rewards),
                         np.median(episode_rewards), np.min(episode_rewards),
                         np.max(episode_rewards),
                         dist_entropy, value_loss, action_loss
                     )
                 )
-            if j % self.cfg.eval_frequency_step == 0:
-                self.evaluate()
 
 
 @hydra.main(config_path='config.yaml', strict=True)

@@ -39,13 +39,13 @@ IM_SIZE = 64
 
 def make_env(
         env_id,
-        env_args=[],
+        env_kwargs={},
         seed=0,
         pytorch_dim_order=True,
         image_size=84,
         augment=False
 ):
-    env = gym.make(env_id, *env_args)
+    env = gym.make(env_id, **env_kwargs)
     if env_id in GYM_ENVS:
         env = ToImageObservation(env)
     elif env_id in DMC2_ENVS:
@@ -64,6 +64,8 @@ def make_env(
             camera_id=camera_id,
             channels_first=False
         )
+
+    env.seed(seed)
 
     # Crop and resize if necessary
     if env_id in CROP_ENVS.keys():

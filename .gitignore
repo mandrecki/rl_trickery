@@ -15,6 +15,9 @@
 # virtual env
 venv
 
+# experiments
+runs
+
 # IPython notebook related#
 **/.ipynb_checkpoints/**
 

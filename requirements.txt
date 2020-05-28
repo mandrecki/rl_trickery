@@ -1,6 +1,7 @@
 
 gym
 hydra-core
+imageio-ffmpeg
 jupyter
 tensorflow
 torch

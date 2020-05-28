@@ -3,22 +3,22 @@ num_train_iters: 1
 num_seed_steps: 1000
 device: cuda:0
 seed: 1
-
-eval_frequency_step: 10000
-num_eval_episodes: 30
+n_params: ???
 
 log_frequency_step: 10
 log_save_tb: true
 save_video: true
+eval_frequency_step: 50
+num_eval_episodes: 32
 
 # global params
 lr: 2.5e-4
 batch_size: 32
 
 env:
-  env_id: Mazelab-v3
+  env_id: Mazelab8-v2
   num_envs: 32
-  image_size: 84
+  image_size: 64
   pytorch_dim_order: true
   frame_stack: 1
   device: ${device}
@@ -48,6 +48,6 @@ agent:
 
 # hydra configuration
 hydra:
-  name: ${env}
+  name: ${env.env_id}
   run:
-    dir: ~/experiments/runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
