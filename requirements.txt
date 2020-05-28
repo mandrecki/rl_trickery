@@ -1,0 +1,11 @@
+
+gym
+hydra-core
+jupyter
+tensorflow
+torch
+torchvision
+
+git+https://github.com/openai/baselines#egg=baselines
+git+https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail#egg=a2c_ppo_acktr
+git+https://github.com/zuoxingdong/mazelab#egg=mazelab
