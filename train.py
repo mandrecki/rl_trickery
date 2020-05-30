@@ -35,10 +35,10 @@ class Workspace(object):
 
         self.cfg = cfg
 
-        # self.logger = Logger(self.work_dir,
-        #                      save_tb=cfg.log_save_tb,
-        #                      log_frequency=cfg.log_frequency_step,
-        #                      agent=cfg.agent.name)
+        self.logger = Logger(self.work_dir,
+                             save_tb=cfg.log_save_tb,
+                             log_frequency=cfg.log_frequency_step,
+                             agent=cfg.agent.name)
 
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
@@ -89,29 +89,6 @@ class Workspace(object):
             self.work_dir if cfg.save_video else None)
         self.step = 0
 
-    def evaluate_old(self):
-        average_episode_reward = 0
-        for episode in range(self.cfg.num_eval_episodes):
-            obs = self.env.reset()
-            self.video_recorder.init(enabled=(episode == 0))
-            done = False
-            episode_reward = 0
-            episode_step = 0
-            while not done:
-                with torch.no_grad():
-                    action = self.agent.act(obs, sample=False)
-                obs, reward, done, info = self.env.step(action[0][0])
-                self.video_recorder.record(self.env)
-                episode_reward += reward
-                episode_step += 1
-
-            average_episode_reward += episode_reward
-            self.video_recorder.save(f'{self.step}.mp4')
-        average_episode_reward /= self.cfg.num_eval_episodes
-        self.logger.log('eval/episode_reward', average_episode_reward,
-                        self.step)
-        self.logger.dump(self.step)
-
     def evaluate(self, step):
         eval_envs = make_envs(
             **self.cfg.env,
@@ -128,7 +105,7 @@ class Workspace(object):
         batched_obs_seq = []
         self.video_recorder.init()
         while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
-            batched_obs_seq.append((obs.cpu().numpy() * 255).astype("uint8"))
+            batched_obs_seq.append((obs[:,:3].cpu().numpy() * 255).astype("uint8"))
             # self.video_recorder.add_torch_obs(obs)
             with torch.no_grad():
                 _, action, _, eval_recurrent_hidden_states = self.net.act(
@@ -153,14 +130,14 @@ class Workspace(object):
         self.video_recorder.save(f'{step}.mp4')
 
         eval_envs.close()
-        print(
-            """Last {} eval episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
-                .format(
-                len(eval_episode_rewards), np.mean(eval_episode_rewards),
-                np.median(eval_episode_rewards),
-                np.min(eval_episode_rewards), np.max(eval_episode_rewards),
-            )
-        )
+        # print(
+        #     """Last {} eval episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
+        #         .format(
+        #         len(eval_episode_rewards), np.mean(eval_episode_rewards),
+        #         np.median(eval_episode_rewards),
+        #         np.min(eval_episode_rewards), np.max(eval_episode_rewards),
+        #     )
+        # )
 
         return eval_episode_rewards
 
@@ -169,13 +146,12 @@ class Workspace(object):
         self.rollouts.obs[0].copy_(obs)
         episode_rewards = deque(maxlen=30)
         num_updates = int(self.cfg.num_train_steps) // self.cfg.agent.num_steps // self.cfg.env.num_envs
-        for j in range(num_updates):
-            if j % self.cfg.eval_frequency_step == 0:
-                self.evaluate(j)
+        total_episodes = 0
 
-            last_time = time.time()
+        for j in range(num_updates):
+            self.step = j
+            start_time = time.time()
             for step in range(self.cfg.agent.num_steps):
-                # Sample actions
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.net.act(
                         self.rollouts.obs[step],
@@ -183,9 +159,7 @@ class Workspace(object):
                         self.rollouts.masks[step]
                     )
 
-                # Obser reward and next obs
                 obs, reward, done, infos = self.env.step(action)
-
                 for info in infos:
                     if 'episode' in info.keys():
                         episode_rewards.append(info['episode']['r'])
@@ -194,6 +168,9 @@ class Workspace(object):
                 masks = torch.FloatTensor(
                     [[0.0] if done_ else [1.0] for done_ in done]
                 )
+                # total_episodes += (1 - masks).sum()
+                total_episodes += sum(done)
+
                 bad_masks = torch.FloatTensor(
                     [[0.0] if 'bad_transition' in info.keys() else [1.0]
                      for info in infos]
@@ -210,25 +187,28 @@ class Workspace(object):
                                      self.cfg.agent.gae_lambda, self.cfg.agent.use_proper_time_limits)
 
             value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
-
             self.rollouts.after_update()
 
+            total_num_steps = (j + 1) * self.cfg.env.num_envs * self.cfg.agent.num_steps
             if j % self.cfg.log_frequency_step == 0 and len(episode_rewards) > 1:
-                total_num_steps = (j + 1) * self.cfg.env.num_envs * self.cfg.agent.num_steps
                 end_time = time.time()
-                print(
-                    """Updates {}, num timesteps {}, FPS {}\n"""
-                    """Last {} training episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
-                    """entropy: {:.2f} value loss: {:.3f} action loss {:.3f}\n"""
-                    .format(
-                        j, total_num_steps,
-                        int(self.cfg.env.num_envs * self.cfg.agent.num_steps / (end_time - last_time)),
-                        len(episode_rewards), np.mean(episode_rewards),
-                        np.median(episode_rewards), np.min(episode_rewards),
-                        np.max(episode_rewards),
-                        dist_entropy, value_loss, action_loss
-                    )
-                )
+                self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)
+                self.logger.log('train/batch_reward', self.rollouts.returns.mean(), total_num_steps)
+                self.logger.log('train/value', self.rollouts.value_preds.mean(), total_num_steps)
+                self.logger.log('train/episode', total_episodes, self.step)
+                self.logger.log('train/timestep', total_num_steps, self.step)
+                self.logger.log('train/duration', end_time - start_time, self.step)
+                self.logger.log('train_loss/critic', value_loss, total_num_steps)
+                self.logger.log('train_loss/actor', action_loss, total_num_steps)
+                self.logger.log('train_loss/entropy', dist_entropy, total_num_steps)
+                self.logger.dump(self.step)
+
+            if j != 0 and j % self.cfg.eval_frequency_step == 0:
+                eval_rewards = self.evaluate(total_num_steps)
+                self.logger.log("eval/episode_reward", np.mean(eval_rewards), total_num_steps)
+                self.logger.log('eval/episode', total_episodes, self.step)
+                self.logger.log('eval/timestep', total_num_steps, self.step)
+                self.logger.dump(self.step)
 
 
 @hydra.main(config_path='config.yaml', strict=True)

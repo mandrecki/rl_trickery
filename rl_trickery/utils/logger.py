@@ -11,22 +11,27 @@ import torchvision
 from termcolor import colored
 from torch.utils.tensorboard import SummaryWriter
 
-COMMON_TRAIN_FORMAT = [('episode', 'E', 'int'), ('step', 'S', 'int'),
-                       ('episode_reward', 'R', 'float'),
-                       ('duration', 'D', 'time')]
+COMMON_TRAIN_FORMAT = [
+    ('episode', 'E', 'int'), ('step', 'S', 'int'), ('timestep', 'T', 'int'),
+    ('duration', 'D', 'time'),
+    ('episode_reward', 'R', 'float')
+    ]
 
-COMMON_EVAL_FORMAT = [('episode', 'E', 'int'), ('step', 'S', 'int'),
-                      ('episode_reward', 'R', 'float')]
+COMMON_EVAL_FORMAT = [
+    ('episode', 'E', 'int'), ('step', 'S', 'int'), ('timestep', 'T', 'int'),
+    ('episode_reward', 'R', 'float')
+]
 
 AGENT_TRAIN_FORMAT = {
     'drq': [('batch_reward', 'BR', 'float'), ('actor_loss', 'ALOSS', 'float'),
             ('critic_loss', 'CLOSS', 'float'),
             ('alpha_loss', 'TLOSS', 'float'), ('alpha_value', 'TVAL', 'float'),
             ('actor_entropy', 'AENT', 'float')],
-    'ppo': [('batch_reward', 'BR', 'float'), ('actor_loss', 'ALOSS', 'float'),
-            ('critic_loss', 'CLOSS', 'float'),
-            ('alpha_loss', 'TLOSS', 'float'), ('alpha_value', 'TVAL', 'float'),
-            ('actor_entropy', 'AENT', 'float')],
+    'ppo': [
+        ('value', 'CVALUE', 'float'),
+        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
+        ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
+    ],
 }
 
 
