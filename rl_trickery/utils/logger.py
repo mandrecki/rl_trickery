@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 COMMON_TRAIN_FORMAT = [
     ('episode', 'E', 'int'), ('step', 'S', 'int'), ('timestep', 'T', 'int'),
-    ('duration', 'D', 'time'),
+    ('fps', 'FPS', 'int'),
     ('episode_reward', 'R', 'float')
     ]
 
@@ -33,6 +33,11 @@ AGENT_TRAIN_FORMAT = {
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
     'a2c': [
+        ('value', 'CVALUE', 'float'),
+        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
+        ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
+    ],
+    'acktr': [
         ('value', 'CVALUE', 'float'),
         ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),

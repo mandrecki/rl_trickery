@@ -1,0 +1,13 @@
+env:
+#  env_id: PongNoFrameskip-v4
+  env_id: BreakoutNoFrameskip-v4
+  num_envs: ${agent.num_envs}
+  image_size: 84
+  to_grayscale: true
+  episode_life: true
+  clip_rewards: true
+  frame_stack: 4
+  frame_skip: 4
+  random_initial_steps: 5
+  pytorch_dim_order: true
+  device: ${device}

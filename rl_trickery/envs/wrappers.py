@@ -3,6 +3,21 @@ import gym
 import cv2
 import torch
 from baselines.common.vec_env import VecEnvWrapper, VecEnvObservationWrapper
+from baselines.common.atari_wrappers import FireResetEnv, EpisodicLifeEnv, ClipRewardEnv, NoopResetEnv, MaxAndSkipEnv
+
+
+def wrap_deepmind_modified(env, episode_life=False, clip_rewards=False, to_grayscale=False):
+    """Configure environment for DeepMind-style Atari.
+    """
+    if episode_life:
+        env = EpisodicLifeEnv(env)
+    if 'FIRE' in env.unwrapped.get_action_meanings():
+        env = FireResetEnv(env)
+    if to_grayscale:
+        env = ToGrayscale(env)
+    if clip_rewards:
+        env = ClipRewardEnv(env)
+    return env
 
 
 # Standardising environments
@@ -37,14 +52,31 @@ class CropImage(gym.ObservationWrapper):
         return image
 
 
+class ToGrayscale(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(ToGrayscale, self).__init__(env)
+        old_shape = env.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=255,
+            shape=(old_shape[0], old_shape[1], 1),
+            dtype=np.uint8,
+        )
+
+    def observation(self, obs):
+        frame = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+        frame = np.expand_dims(frame, -1)
+        return frame
+
+
 class ResizeImage(gym.ObservationWrapper):
     def __init__(self, env, new_size, antialias=False):
         super(ResizeImage, self).__init__(env)
         self.new_size = new_size
         self.antialias = antialias
-        channels = 3
+        self.channels = env.observation_space.shape[2]
         self.observation_space = gym.spaces.Box(0, 255,
-                                                [*self.new_size, channels],
+                                                [*self.new_size, self.channels],
                                                 dtype=np.uint8)
 
     def add_padding(self, image):
@@ -67,6 +99,10 @@ class ResizeImage(gym.ObservationWrapper):
             image = cv2.resize(image, self.new_size, interpolation=cv2.INTER_NEAREST)
         else:
             image = cv2.resize(image, self.new_size, interpolation=cv2.INTER_AREA)
+
+        if len(image.shape) == 2:
+            image = np.expand_dims(image, -1)
+
         return image
 
 
@@ -89,9 +125,46 @@ class RandomPadCropImage(gym.ObservationWrapper):
         image = image[self.y0: (self.y0-2*self.padding), self.x0: (self.x0-2*self.padding)]
         return image
 
+
 class ScaleImage(gym.ObservationWrapper):
     def observation(self, image):
-        return image/255
+        return image/255.0
+
+
+class StepSkipEnv(gym.Wrapper):
+    def __init__(self, env, skip=4):
+        """Return only every `skip`-th frame"""
+        super(StepSkipEnv, self).__init__(env)
+        # most recent raw observations (for max pooling across time steps)
+        self._skip = skip
+
+    def step(self, action):
+        """Repeat action, sum reward."""
+        total_reward = 0.0
+        done = None
+        for i in range(self._skip):
+            obs, reward, done, info = self.env.step(action)
+            total_reward += reward
+            if done:
+                break
+
+        return obs, total_reward, done, info
+
+
+class RandomResetSteps(gym.Wrapper):
+    def __init__(self, env, max_random_steps=30):
+        super(RandomResetSteps, self).__init__(env)
+        self.max_random_steps = max_random_steps
+
+    def reset(self):
+        obs = self.env.reset()
+        for i in range(np.random.randint(0, self.max_random_steps)):
+            obs, reward, done, info = self.env.step(self.env.action_space.sample())
+            if done:
+                obs = self.env.reset()
+
+        return obs
+
 
 
 class VecPyTorch(VecEnvWrapper):
@@ -168,7 +241,7 @@ class TransposeImage(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Box(
             self.observation_space.low[0, 0, 0],
             self.observation_space.high[0, 0, 0],
-            [obs_shape[2], obs_shape[1], obs_shape[0]],
+            [obs_shape[2], obs_shape[0], obs_shape[1]],
             dtype=self.observation_space.dtype)
 
     def observation(self, observation):

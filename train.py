@@ -24,8 +24,7 @@ from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
 from rl_trickery.envs import make_envs
 
-
-torch.backends.cudnn.benchmark = True
+# torch.backends.cudnn.benchmark = True
 
 
 class Workspace(object):
@@ -63,7 +62,8 @@ class Workspace(object):
                 lr=cfg.agent.lr,
                 eps=cfg.agent.eps,
                 alpha=cfg.agent.alpha,
-                max_grad_norm=cfg.agent.max_grad_norm)
+                max_grad_norm=cfg.agent.max_grad_norm
+            )
         elif cfg.agent.name == 'ppo':
             self.agent = PPO(
                 self.net,
@@ -74,7 +74,16 @@ class Workspace(object):
                 cfg.agent.entropy_coef,
                 lr=cfg.agent.lr,
                 eps=cfg.agent.eps,
-                max_grad_norm=cfg.agent.max_grad_norm)
+                max_grad_norm=cfg.agent.max_grad_norm
+            )
+        elif cfg.agent.name == 'acktr':
+            self.agent = A2C_ACKTR(
+                self.net,
+                cfg.agent.value_loss_coef,
+                cfg.agent.entropy_coef,
+                acktr=True
+            )
+
 
         self.rollouts = RolloutStorage(
             cfg.agent.num_steps,
@@ -130,30 +139,16 @@ class Workspace(object):
         self.video_recorder.save(f'{step}.mp4')
 
         eval_envs.close()
-        # print(
-        #     """Last {} eval episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"""
-        #         .format(
-        #         len(eval_episode_rewards), np.mean(eval_episode_rewards),
-        #         np.median(eval_episode_rewards),
-        #         np.min(eval_episode_rewards), np.max(eval_episode_rewards),
-        #     )
-        # )
-
         return eval_episode_rewards
 
     def run(self):
-        obs = self.env.reset()
         episode_rewards = deque(maxlen=30)
-        num_updates = int(self.cfg.num_train_steps) // self.cfg.agent.num_steps // self.cfg.env.num_envs
+        timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.env.num_envs * self.cfg.env.frame_skip)
+        num_updates = int(self.cfg.num_train_steps // timesteps_per_update)
         total_episodes = 0
 
-        # random start
-        # for _ in range(150):
-        #     action = torch.tensor(self.env.action_space.sample())
-        #     print(action)
-        #     obs, reward, done, infos = self.env.step(action)
-        #
-        # self.rollouts.obs[0].copy_(obs)
+        obs = self.env.reset()
+        self.rollouts.obs[0].copy_(obs)
         for j in range(num_updates):
             self.step = j
             start_time = time.time()
@@ -195,8 +190,9 @@ class Workspace(object):
             value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
             self.rollouts.after_update()
 
-            total_num_steps = (j + 1) * self.cfg.env.num_envs * self.cfg.agent.num_steps
-            if j % self.cfg.log_frequency_step == 0 and len(episode_rewards) > 1:
+            total_num_steps = (j + 1) * timesteps_per_update
+            if j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
+                    and len(episode_rewards) > 1:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)
                 self.logger.log('train/batch_reward', self.rollouts.returns.mean(), total_num_steps)
@@ -204,12 +200,13 @@ class Workspace(object):
                 self.logger.log('train/episode', total_episodes, self.step)
                 self.logger.log('train/timestep', total_num_steps, self.step)
                 self.logger.log('train/duration', end_time - start_time, self.step)
+                self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), self.step)
                 self.logger.log('train_loss/critic', value_loss, total_num_steps)
                 self.logger.log('train_loss/actor', action_loss, total_num_steps)
                 self.logger.log('train_loss/entropy', dist_entropy, total_num_steps)
                 self.logger.dump(self.step)
 
-            if j != 0 and j % self.cfg.eval_frequency_step == 0:
+            if j != 0 and j % (self.cfg.eval_frequency_step // self.cfg.agent.num_steps) == 0:
                 eval_rewards = self.evaluate(total_num_steps)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), total_num_steps)
                 self.logger.log('eval/episode', total_episodes, self.step)
@@ -217,9 +214,10 @@ class Workspace(object):
                 self.logger.dump(self.step)
 
 
-@hydra.main(config_path='config.yaml', strict=True)
+@hydra.main(config_path='configs/config.yaml', strict=True)
 def main(cfg):
     workspace = Workspace(cfg)
+    print(cfg.pretty())
     workspace.run()
 
 

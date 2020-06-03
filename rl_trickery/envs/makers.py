@@ -2,12 +2,14 @@ import gym
 import numpy as np
 
 from baselines.common.vec_env import DummyVecEnv, VecEnvWrapper, SubprocVecEnv
-from baselines.common.atari_wrappers import MaxAndSkipEnv
 from baselines import bench
 
+from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
-from .wrappers import ToImageObservation, CropImage, ResizeImage, RandomPadCropImage, ScaleImage, TransposeImage, VecPyTorch, \
-    VecPyTorchFrameStack
+
+from .wrappers import ToImageObservation, CropImage, ResizeImage, RandomPadCropImage,\
+    ScaleImage, StepSkipEnv, RandomResetSteps, TransposeImage, VecPyTorch, \
+    VecPyTorchFrameStack, wrap_deepmind_modified
 
 env_id = "EmptyMazelab-v0"
 
@@ -35,8 +37,6 @@ UPSCALE_ENVS = [
 CROP_ENVS = {
 }
 
-IM_SIZE = 64
-
 
 def make_env(
         env_id,
@@ -44,7 +44,10 @@ def make_env(
         seed=0,
         pytorch_dim_order=True,
         image_size=84,
-        augment=False
+        frame_skip=1,
+        augment=False,
+        random_initial_steps=0,
+        **kwargs
 ):
     env = gym.make(env_id, **env_kwargs)
     if env_id in GYM_ENVS:
@@ -68,6 +71,18 @@ def make_env(
 
     env.seed(seed)
 
+    if random_initial_steps > 0:
+        env = RandomResetSteps(env, random_initial_steps)
+    if frame_skip > 1:
+        env = StepSkipEnv(env, skip=frame_skip)
+    env = bench.Monitor(env, filename=None, allow_early_resets=True)
+    env = wrap_deepmind_modified(env, **kwargs)
+
+    # standard pytorch-a2c way
+    # env = make_atari(env_id)
+    # env = bench.Monitor(env, filename=None, allow_early_resets=True)
+    # env = wrap_deepmind(env)
+
     # Crop and resize if necessary
     if env_id in CROP_ENVS.keys():
         env = CropImage(env, CROP_ENVS.get(env_id))
@@ -80,12 +95,9 @@ def make_env(
 
     if augment:
         env = RandomPadCropImage(env)
-    env = ScaleImage(env)
 
     if pytorch_dim_order:
         env = TransposeImage(env)
-
-    env = bench.Monitor(env, filename=None, allow_early_resets=True)
 
     return env
 

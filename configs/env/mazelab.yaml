@@ -1,0 +1,9 @@
+env:
+  env_id: Mazelab12-v1
+  num_envs: ${agent.num_envs}
+  image_size: 84
+  pytorch_dim_order: true
+  frame_stack: 1
+  frame_skip: 1
+  random_initial_steps: 5
+  device: ${device}

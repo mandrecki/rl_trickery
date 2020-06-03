@@ -17,6 +17,7 @@ venv
 
 # experiments
 runs
+multirun
 
 # IPython notebook related#
 **/.ipynb_checkpoints/**

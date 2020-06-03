@@ -1,0 +1,40 @@
+agent:
+  alpha: 0.99
+  device: ${device}
+  entropy_coef: 0.01
+  eps: 1.0e-05
+  gae_lambda: 0.95
+  gamma: 0.99
+  lr: 0.0007
+  max_grad_norm: 0.5
+  name: a2c
+  num_env_steps: 10000000.0
+  num_envs: 16
+  num_steps: 5
+  recurrent_policy: false
+  use_gae: false
+  use_proper_time_limits: false
+  value_loss_coef: 0.5
+device: cuda:0
+env:
+  clip_rewards: true
+  device: ${device}
+  env_id: BreakoutNoFrameskip-v4
+  episode_life: true
+  frame_skip: 4
+  frame_stack: 4
+  image_size: 84
+  num_envs: ${agent.num_envs}
+  pytorch_dim_order: true
+  random_initial_steps: 5
+  to_grayscale: true
+eval_frequency_step: 50000.0
+log_frequency_step: 1000.0
+log_save_tb: true
+n_params: ???
+num_eval_episodes: 10
+num_seed_steps: 1000
+num_train_iters: 1
+num_train_steps: ${agent.num_env_steps}
+save_video: true
+seed: 1
