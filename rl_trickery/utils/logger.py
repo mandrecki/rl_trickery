@@ -32,6 +32,11 @@ AGENT_TRAIN_FORMAT = {
         ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
+    'a2c': [
+        ('value', 'CVALUE', 'float'),
+        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
+        ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
+    ],
 }
 
 

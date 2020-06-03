@@ -143,11 +143,17 @@ class Workspace(object):
 
     def run(self):
         obs = self.env.reset()
-        self.rollouts.obs[0].copy_(obs)
         episode_rewards = deque(maxlen=30)
         num_updates = int(self.cfg.num_train_steps) // self.cfg.agent.num_steps // self.cfg.env.num_envs
         total_episodes = 0
 
+        # random start
+        # for _ in range(150):
+        #     action = torch.tensor(self.env.action_space.sample())
+        #     print(action)
+        #     obs, reward, done, infos = self.env.step(action)
+        #
+        # self.rollouts.obs[0].copy_(obs)
         for j in range(num_updates):
             self.step = j
             start_time = time.time()

@@ -13,11 +13,11 @@ num_eval_episodes: 32
 
 # global params
 lr: 2.5e-4
-batch_size: 32
+batch_size: 8
 
 env:
-#  env_id: Mazelab12-v1
-  env_id: Breakout-v0
+  env_id: Mazelab12-v1
+#  env_id: BreakoutDeterministic-v4
   num_envs: 8
   image_size: 84
   pytorch_dim_order: true

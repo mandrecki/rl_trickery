@@ -2,6 +2,7 @@ import gym
 import numpy as np
 
 from baselines.common.vec_env import DummyVecEnv, VecEnvWrapper, SubprocVecEnv
+from baselines.common.atari_wrappers import MaxAndSkipEnv
 from baselines import bench
 
 
