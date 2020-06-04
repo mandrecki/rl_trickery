@@ -1,20 +1,17 @@
 agent:
-  name: ppo
-  num_envs: ${agent.num_mini_batch}
+  name: a2c
+  num_envs: 16
   recurrent_policy: true
-  lr: 1e-4
+  lr: 7e-4
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
-  num_steps: 64
-  num_mini_batch: 8
+  num_steps: 5
   num_env_steps: 1e7
   eps: 1e-5
   alpha: 0.99
   max_grad_norm: 0.5
-  clip_param: 0.1
-  ppo_epoch: 16
   device: ${device}
-  use_gae: true
+  use_gae: false
   gae_lambda: 0.95
   use_proper_time_limits: False

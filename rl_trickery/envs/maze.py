@@ -1,4 +1,5 @@
 import numpy as np
+import pkg_resources
 
 from gym.spaces import Box
 from gym.spaces import Discrete
@@ -21,7 +22,7 @@ class BoardColor:
 def generate(kind, size=12):
     if kind == "empty":
         return generate_empty(size)
-    elif kind == "random":
+    elif kind == "maze":
         return generate_random(size)
     else:
         raise ValueError("Bad maze kind {}".format(kind))
@@ -42,7 +43,7 @@ def generate_empty(size=12):
 
 
 class Maze(BaseMaze):
-    def __init__(self, kind, size):
+    def __init__(self, kind="empty", size=12):
         self.start = np.array([[0,0]])
         self.goal = np.array([[0,0]])
         self.board = generate(kind, size)
@@ -77,23 +78,36 @@ class Maze(BaseMaze):
         self.goal = goal_idx
         return self.goal
 
+    def default_goal(self):
+        self.goal = np.atleast_2d(np.unravel_index(np.argmin(self.board, axis=None), self.board.shape))
 
-FIXED_SEED = 4
+    def from_numpy(self, array):
+        self.board = array
+        self.randomize_agent()
+        self.randomize_goal()
+        super().__init__()
+        return self
 
 
 class MazelabEnv(BaseEnv):
-    def __init__(self, **kwargs):
+    def __init__(self, maze_size, maze_kind, goal_fixed, maze_fixed, goal_reward, **kwargs):
         super().__init__()
+        self.size = maze_size
+        self.kind = maze_kind
+        self.maze_fixed = maze_fixed
+        self.goal_fixed = goal_fixed
+        self.goal_reward = goal_reward
 
-        self.kind = kwargs.get("kind")
-        self.fixed = kwargs.get("fixed", False)
-        self.size = kwargs.get("size", 12)
-        self.variable_goal = kwargs.get("variable_goal", False)
+        if self.maze_fixed and self.kind == "maze":
+            file = pkg_resources.resource_filename("rl_trickery", "envs/mazes/raw_maze_{}.npy".format(int(self.size)))
+            array = np.load(file)
+            self.maze = Maze("empty", 8).from_numpy(array)
+        else:
+            self.maze = Maze(self.kind, self.size)
 
-        if self.fixed:
-            np.random.seed(FIXED_SEED)
+        if self.goal_fixed:
+            self.maze.default_goal()
 
-        self.maze = Maze(self.kind, self.size)
         self.motions = VonNeumannMotion()
 
         self.observation_space = Box(low=0, high=255, shape=list(self.maze.size)+[3], dtype=np.uint8)
@@ -108,7 +122,7 @@ class MazelabEnv(BaseEnv):
             self.maze.objects.agent.positions = [new_position]
 
         if self._is_goal(new_position):
-            reward = +1
+            reward = int(self.goal_reward)
             done = True
         else:
             reward = -0.01
@@ -117,22 +131,17 @@ class MazelabEnv(BaseEnv):
 
     def seed(self, seed=None):
         s = np.random.seed(seed)
-
-        if hasattr(self, "fixed"):
-            if not self.fixed:
-                self.maze = Maze(self.kind, self.size)
-            elif self.variable_goal:
-                self.maze.randomize_goal()
         return s
 
     def reset(self):
-        if not self.fixed:
+        if not self.maze_fixed and self.kind != "empty":
             self.maze = Maze(self.kind, self.size)
-        elif self.variable_goal:
+
+        if not self.goal_fixed:
             self.maze.randomize_goal()
 
-        self.maze.objects.agent.positions = self.maze.randomize_agent()
         self.maze.objects.goal.positions = self.maze.goal
+        self.maze.objects.agent.positions = self.maze.randomize_agent()
         return self.maze.to_rgb()
 
     def _is_valid(self, position):

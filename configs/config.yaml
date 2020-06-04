@@ -9,12 +9,15 @@ log_frequency_step: 1e3
 log_save_tb: true
 save_video: true
 eval_frequency_step: 5e4
-num_eval_episodes: 10
+num_eval_episodes: 30
 
 defaults:
-  - env: atari
-  - agent: a2c
+#  - env: atari
+  - env: mazelab
+#  - agent: a2c_atari
+#  - agent: a2c_atari_recurrent
 #  - agent: ppo
+  - agent: ppo_recurrent
 
 # hydra configuration
 hydra:

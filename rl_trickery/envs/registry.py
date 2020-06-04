@@ -1,6 +1,9 @@
 import gym
 from .maze import MazelabEnv
 
+gym.envs.register(
+    id="Mazelab-v0", entry_point=MazelabEnv, max_episode_steps=400)
+
 env_name = "Mazelab{}-v{}"
 for size in [8, 12, 16, 32]:
     gym.envs.register(

@@ -44,7 +44,12 @@ class Workspace(object):
 
         self.env = make_envs(
             **cfg.env,
-            seed=cfg.seed
+            seed=self.cfg.seed
+        )
+
+        self.eval_envs = make_envs(
+            **self.cfg.env,
+            seed=self.cfg.seed+1337,
         )
 
         self.net = Policy(
@@ -99,13 +104,8 @@ class Workspace(object):
         self.step = 0
 
     def evaluate(self, step):
-        eval_envs = make_envs(
-            **self.cfg.env,
-            seed=self.cfg.seed,
-        )
         eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
-
-        obs = eval_envs.reset()
+        obs = self.eval_envs.reset()
         eval_recurrent_hidden_states = torch.zeros(
             self.cfg.env.num_envs, self.net.recurrent_hidden_state_size, device=self.device
         )
@@ -114,7 +114,7 @@ class Workspace(object):
         batched_obs_seq = []
         self.video_recorder.init()
         while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
-            batched_obs_seq.append((obs[:,:3].cpu().numpy() * 255).astype("uint8"))
+            batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
             # self.video_recorder.add_torch_obs(obs)
             with torch.no_grad():
                 _, action, _, eval_recurrent_hidden_states = self.net.act(
@@ -125,7 +125,7 @@ class Workspace(object):
                 )
 
             # Obser reward and next obs
-            obs, _, done, infos = eval_envs.step(action)
+            obs, _, done, infos = self.eval_envs.step(action)
 
             eval_masks = torch.tensor(
                 [[0.0] if done_ else [1.0] for done_ in done],
@@ -138,7 +138,6 @@ class Workspace(object):
         self.video_recorder.capture(batched_obs_seq)
         self.video_recorder.save(f'{step}.mp4')
 
-        eval_envs.close()
         return eval_episode_rewards
 
     def run(self):
@@ -206,7 +205,9 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', dist_entropy, total_num_steps)
                 self.logger.dump(self.step)
 
-            if j != 0 and j % (self.cfg.eval_frequency_step // self.cfg.agent.num_steps) == 0:
+            # if j != 0\
+            if j % (self.cfg.eval_frequency_step // self.cfg.agent.num_steps) == 0\
+                    or j == num_updates-1:
                 eval_rewards = self.evaluate(total_num_steps)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), total_num_steps)
                 self.logger.log('eval/episode', total_episodes, self.step)

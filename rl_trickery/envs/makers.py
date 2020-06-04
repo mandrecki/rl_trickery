@@ -11,7 +11,6 @@ from .wrappers import ToImageObservation, CropImage, ResizeImage, RandomPadCropI
     ScaleImage, StepSkipEnv, RandomResetSteps, TransposeImage, VecPyTorch, \
     VecPyTorchFrameStack, wrap_deepmind_modified
 
-env_id = "EmptyMazelab-v0"
 
 
 ABSTRACT_ENVS = [
@@ -31,7 +30,7 @@ DMC2_ENVS = [
 CONTROL_SUITE_ACTION_REPEATS = {"cartpole": 8, "reacher": 4, "finger": 2, "cheetah": 4, "ball_in_cup": 2, "walker": 2}
 
 UPSCALE_ENVS = [
-    "EmptyMazelab-v0",
+    "Mazelab-v0",
 ]
 
 CROP_ENVS = {

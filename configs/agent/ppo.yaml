@@ -13,7 +13,7 @@ agent:
   alpha: 0.99
   max_grad_norm: 0.5
   clip_param: 0.1
-  ppo_epoch: 4
+  ppo_epoch: 16
   device: ${device}
   use_gae: true
   gae_lambda: 0.95

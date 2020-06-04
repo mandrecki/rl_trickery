@@ -1,9 +1,19 @@
 env:
-  env_id: Mazelab12-v1
+  env_id: Mazelab-v0
   num_envs: ${agent.num_envs}
-  image_size: 84
-  pytorch_dim_order: true
+  env_kwargs:
+    maze_kind: maze
+    maze_size: 15
+    maze_fixed: true
+    goal_fixed: false
+    goal_reward: true
+  image_size: 64
+  to_grayscale: false
+  episode_life: false
+  clip_rewards: false
+  augment: false
   frame_stack: 1
   frame_skip: 1
-  random_initial_steps: 5
+  random_initial_steps: 0
+  pytorch_dim_order: true
   device: ${device}

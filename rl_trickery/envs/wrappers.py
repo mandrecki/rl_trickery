@@ -11,8 +11,6 @@ def wrap_deepmind_modified(env, episode_life=False, clip_rewards=False, to_grays
     """
     if episode_life:
         env = EpisodicLifeEnv(env)
-    if 'FIRE' in env.unwrapped.get_action_meanings():
-        env = FireResetEnv(env)
     if to_grayscale:
         env = ToGrayscale(env)
     if clip_rewards:
@@ -113,7 +111,7 @@ class RandomPadCropImage(gym.ObservationWrapper):
         self.x0, self.y0 = padding, padding
 
     def add_padding(self, image):
-        image = cv2.copyMakeBorder(image, *tuple(4*[self.padding]), cv2.BORDER_CONSTANT, value=(30, 30, 30))
+        image = cv2.copyMakeBorder(image, *tuple(4*[self.padding]), cv2.BORDER_CONSTANT, value=(0, 0, 0))
         return image
 
     def reset(self):
