@@ -15,9 +15,9 @@ defaults:
 #  - env: atari
   - env: mazelab
 #  - agent: a2c
-#  - agent: a2c_recurrent
+  - agent: a2c_recurrent
 #  - agent: ppo
-  - agent: ppo_recurrent
+#  - agent: ppo_recurrent
 
 # hydra configuration
 hydra:

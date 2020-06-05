@@ -2,11 +2,11 @@ agent:
   name: a2c
   num_envs: 16
   recurrent_policy: true
-  lr: 1e-4
+  lr: 7e-4
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
-  num_steps: 5
+  num_steps: 25
   num_env_steps: 1e7
   eps: 1e-5
   alpha: 0.99
