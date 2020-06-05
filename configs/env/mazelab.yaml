@@ -3,7 +3,7 @@ env:
   num_envs: ${agent.num_envs}
   env_kwargs:
     maze_kind: maze
-    maze_size: 15
+    maze_size: 11
     maze_fixed: false
     goal_fixed: false
     goal_reward: false

@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # from a2c_ppo_acktr.model import Policy
-from rl_trickery.models.policy_networks import Policy
+from rl_trickery.models.policy_networks import Policy, RecurrentPolicy
 from a2c_ppo_acktr.algo import PPO, A2C_ACKTR
 from a2c_ppo_acktr.storage import RolloutStorage
 
@@ -52,11 +52,18 @@ class Workspace(object):
             **self.cfg.env,
             seed=self.cfg.seed+1337,
         )
-
-        self.net = Policy(
+        self.net = RecurrentPolicy(
             self.env.observation_space.shape,
             self.env.action_space,
-            base_kwargs={'recurrent': cfg.agent.recurrent_policy})
+            architecture=cfg.agent.architecture,
+            hidden_size=512,
+            recurse_depth=cfg.agent.recurse_depth
+        )
+        # self.net = Policy(
+        #     self.env.observation_space.shape,
+        #     self.env.action_space,
+        #     base_kwargs={'recurrent': cfg.agent.recurrent_policy}
+        # )
         self.net.to(self.device)
         self.cfg.n_params = utils.get_n_params(self.net)
 
@@ -181,8 +188,10 @@ class Workspace(object):
 
             with torch.no_grad():
                 next_value = self.net.get_value(
-                    self.rollouts.obs[-1], self.rollouts.recurrent_hidden_states[-1],
-                    self.rollouts.masks[-1]).detach()
+                    self.rollouts.obs[-1],
+                    self.rollouts.recurrent_hidden_states[-1],
+                    self.rollouts.masks[-1]
+                ).detach()
 
             self.rollouts.compute_returns(next_value, self.cfg.agent.use_gae, self.cfg.agent.gamma,
                                      self.cfg.agent.gae_lambda, self.cfg.agent.use_proper_time_limits)
@@ -195,7 +204,7 @@ class Workspace(object):
                     and len(episode_rewards) > 1:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)
-                self.logger.log('train/batch_reward', self.rollouts.returns.mean(), total_num_steps)
+                # self.logger.log('train/batch_return', self.rollouts.returns.mean(), total_num_steps)
                 self.logger.log('train/value', self.rollouts.value_preds.mean(), total_num_steps)
                 self.logger.log('train/episode', total_episodes, self.step)
                 self.logger.log('train/timestep', total_num_steps, self.step)

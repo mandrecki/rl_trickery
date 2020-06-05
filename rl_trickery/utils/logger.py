@@ -29,12 +29,14 @@ AGENT_TRAIN_FORMAT = {
             ('actor_entropy', 'AENT', 'float')],
     'ppo': [
         ('value', 'CVALUE', 'float'),
-        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
+        # ('batch_return', 'BR', 'float'),
+        ('loss_actor', 'ALOSS', 'float'),
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
     'a2c': [
         ('value', 'CVALUE', 'float'),
-        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
+        # ('batch_return', 'BR', 'float'),
+        ('loss_actor', 'ALOSS', 'float'),
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
     'acktr': [

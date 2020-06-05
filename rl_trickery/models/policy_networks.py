@@ -239,40 +239,6 @@ class CNNBase64(NNBase):
         return self.critic_linear(x), x, rnn_hxs
 
 
-class MLPBase(NNBase):
-    def __init__(self, num_inputs, recurrent=False, hidden_size=64):
-        super(MLPBase, self).__init__(recurrent, num_inputs, hidden_size)
-
-        if recurrent:
-            num_inputs = hidden_size
-
-        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
-                               constant_(x, 0), np.sqrt(2))
-
-        self.actor = nn.Sequential(
-            init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-
-        self.critic = nn.Sequential(
-            init_(nn.Linear(num_inputs, hidden_size)), nn.Tanh(),
-            init_(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-
-        self.critic_linear = init_(nn.Linear(hidden_size, 1))
-
-        self.train()
-
-    def forward(self, inputs, rnn_hxs, masks):
-        x = inputs
-
-        if self.is_recurrent:
-            x, rnn_hxs = self._forward_gru(x, rnn_hxs, masks)
-
-        hidden_critic = self.critic(x)
-        hidden_actor = self.actor(x)
-
-        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
-
-
 class NoTransition(nn.Module):
     def __init__(self, hidden_size):
         super(NoTransition, self).__init__()
@@ -284,17 +250,18 @@ class NoTransition(nn.Module):
                 nn.ReLU()
         )
 
-    def forward(self, x, rnn_state):
+    def forward(self, x, rnn_state, masks):
         x = self.flat_lin(x)
-        return x, None
+        return x, rnn_state
 
 
 class RNNTransition(nn.Module):
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, recurse_depth):
         super(RNNTransition, self).__init__()
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
                                nn.init.calculate_gain('relu'))
-        self.recurrent_hidden_state_size = 1
+        self.recurse_depth = recurse_depth
+        self.recurrent_hidden_state_size = hidden_size
         self.flat_lin = nn.Sequential(
                 Flatten(),
                 init_(nn.Linear(32 * 7 * 7, hidden_size)),
@@ -364,15 +331,31 @@ class RNNTransition(nn.Module):
 
         return x, hxs
 
-    def forward(self, x, rnn_state):
+    def forward(self, x, hxs, masks):
         x = self.flat_lin(x)
-        x, rnn_state = self.rnn(x, rnn_state)
+        for i in range(self.recurse_depth):
+            y, hxs = self._forward_gru(x, hxs, masks)
+            masks = 1 - (0*masks)
 
-        return x, rnn_state
+        return y, hxs
 
+from .crnn import ConvLSTM
+
+class CRNNTransition(nn.Module):
+    def __init__(self, hidden_size, recurse_depth):
+        super(CRNNTransition, self).__init__()
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
+                               nn.init.calculate_gain('relu'))
+        self.recurse_depth = recurse_depth
+        self.recurrent_hidden_state_size = hidden_size
+        self.flat_lin = nn.Sequential(
+                Flatten(),
+                init_(nn.Linear(32 * 7 * 7, hidden_size)),
+                nn.ReLU()
+        )
 
 class RecurrentPolicy(nn.Module):
-    def __init__(self, obs_shape, action_space, architecture, hidden_size):
+    def __init__(self, obs_shape, action_space, architecture, hidden_size, recurse_depth):
         super(RecurrentPolicy, self).__init__()
 
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain('relu'))
@@ -406,22 +389,16 @@ class RecurrentPolicy(nn.Module):
 
         if architecture == "ff":
             self.transition = NoTransition(hidden_size)
-            self.recurrent_hidden_state_size = self.transition.recurrent_hidden_state_size
-            self.recurse = nn.Sequential(
-                Flatten(),
-                init_(nn.Linear(32 * 7 * 7, hidden_size)),
-                nn.ReLU()
-            )
         elif architecture == "rnn":
-
-            self.recurrent_hidden_state_size = hidden_size
-            pass
+            self.transition = RNNTransition(hidden_size, recurse_depth)
         elif architecture == "crnn":
-            self.recurrent_hidden_state_size = None
-            pass
+            raise NotImplementedError
+            # self.transition = CRNNTransition(hidden_size)
         else:
             raise NotImplementedError
 
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0))
+        self.critic_linear = init_(nn.Linear(self.hidden_size, 1))
 
         if action_space.__class__.__name__ == "Discrete":
             num_outputs = action_space.n
@@ -435,13 +412,22 @@ class RecurrentPolicy(nn.Module):
         else:
             raise NotImplementedError
 
+        self.train()
+
+    @property
+    def recurrent_hidden_state_size(self):
+        if self.is_recurrent:
+            return self.transition.recurrent_hidden_state_size
+        return 1
 
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
 
     def act(self, inputs, rnn_hxs, masks, deterministic=False):
-        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
-        dist = self.dist(actor_features)
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
+        dist = self.dist(x)
 
         if deterministic:
             action = dist.mode()
@@ -454,12 +440,16 @@ class RecurrentPolicy(nn.Module):
         return value, action, action_log_probs, rnn_hxs
 
     def get_value(self, inputs, rnn_hxs, masks):
-        value, _, _ = self.base(inputs, rnn_hxs, masks)
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
         return value
 
     def evaluate_actions(self, inputs, rnn_hxs, masks, action):
-        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
-        dist = self.dist(actor_features)
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
+        dist = self.dist(x)
 
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
