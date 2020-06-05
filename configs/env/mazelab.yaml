@@ -2,7 +2,7 @@ env:
   env_id: Mazelab-v0
   num_envs: ${agent.num_envs}
   env_kwargs:
-    maze_kind: maze
+    maze_kind: empty
     maze_size: 15
     maze_fixed: true
     goal_fixed: false

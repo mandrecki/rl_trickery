@@ -14,8 +14,8 @@ num_eval_episodes: 30
 defaults:
 #  - env: atari
   - env: mazelab
-#  - agent: a2c_atari
-#  - agent: a2c_atari_recurrent
+#  - agent: a2c
+#  - agent: a2c_recurrent
 #  - agent: ppo
   - agent: ppo_recurrent
 

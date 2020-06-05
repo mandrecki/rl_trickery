@@ -13,7 +13,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from a2c_ppo_acktr.model import Policy
+# from a2c_ppo_acktr.model import Policy
+from rl_trickery.models.policy_networks import Policy
 from a2c_ppo_acktr.algo import PPO, A2C_ACKTR
 from a2c_ppo_acktr.storage import RolloutStorage
 
