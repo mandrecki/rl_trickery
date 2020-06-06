@@ -56,9 +56,7 @@ class Workspace(object):
         self.net = RecurrentPolicy(
             self.env.observation_space.shape,
             self.env.action_space,
-            architecture=cfg.agent.architecture,
-            hidden_size=512,
-            recurse_depth=cfg.agent.recurse_depth
+            **cfg.agent.network,
         )
         self.net.to(self.device)
 
@@ -91,7 +89,6 @@ class Workspace(object):
                 cfg.agent.entropy_coef,
                 acktr=True
             )
-
 
         self.rollouts = RolloutStorage(
             cfg.agent.num_steps,

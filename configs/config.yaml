@@ -14,11 +14,11 @@ defaults:
 #  - env: atari
   - env: mazelab
 #  - agent: a2c
-#  - agent: a2c_recurrent
-#  - agent: a2c_conv_recurrent
+#  - agent: a2c_rnn
+  - agent: a2c_crnn
 #  - agent: ppo
-#  - agent: ppo_recurrent
-  - agent: ppo_conv_recurrent
+#  - agent: ppo_rnn
+#  - agent: ppo_crnn
 
 # hydra configuration
 hydra:

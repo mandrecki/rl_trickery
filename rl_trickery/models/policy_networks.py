@@ -241,13 +241,13 @@ class CNNBase64(NNBase):
 
 
 class NoTransition(nn.Module):
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, state_channels):
         super(NoTransition, self).__init__()
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain('relu'))
         self.recurrent_hidden_state_size = 1
         self.flat_lin = nn.Sequential(
                 Flatten(),
-                init_(nn.Linear(32 * 7 * 7, hidden_size)),
+                init_(nn.Linear(state_channels * 7 * 7, hidden_size)),
                 nn.ReLU()
         )
 
@@ -257,8 +257,8 @@ class NoTransition(nn.Module):
 
 
 class RNNTransition(NoTransition):
-    def __init__(self, hidden_size, recurse_depth):
-        super(RNNTransition, self).__init__(hidden_size)
+    def __init__(self, hidden_size, state_channels, recurse_depth):
+        super(RNNTransition, self).__init__(hidden_size, state_channels)
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
                                nn.init.calculate_gain('relu'))
         self.recurse_depth = recurse_depth
@@ -270,70 +270,6 @@ class RNNTransition(NoTransition):
                 nn.init.constant_(param, 0)
             elif 'weight' in name:
                 nn.init.orthogonal_(param)
-
-    def _forward_gru(self, x, hxs, masks):
-        if x.size(0) == hxs.size(0):
-            x, hxs = self.gru(x.unsqueeze(0), (hxs * masks).unsqueeze(0))
-            x = x.squeeze(0)
-            hxs = hxs.squeeze(0)
-        else:
-            print("here")
-            # x is a (T, N, -1) tensor that has been flatten to (T * N, -1)
-            N = hxs.size(0)
-            T = int(x.size(0) / N)
-
-            # unflatten
-            x = x.view(T, N, x.size(1))
-
-            # Same deal with masks
-            masks = masks.view(T, N)
-
-            # Let's figure out which steps in the sequence have a zero for any agent
-            # We will always assume t=0 has a zero in it as that makes the logic cleaner
-            has_zeros = ((masks[1:] == 0.0) \
-                            .any(dim=-1)
-                            .nonzero()
-                            .squeeze()
-                            .cpu())
-
-            # +1 to correct the masks[1:]
-            if has_zeros.dim() == 0:
-                # Deal with scalar
-                has_zeros = [has_zeros.item() + 1]
-            else:
-                has_zeros = (has_zeros + 1).numpy().tolist()
-
-            # add t=0 and t=T to the list
-            has_zeros = [0] + has_zeros + [T]
-
-            hxs = hxs.unsqueeze(0)
-            outputs = []
-            for i in range(len(has_zeros) - 1):
-                # We can now process steps that don't have any zeros in masks together!
-                # This is much faster
-                start_idx = has_zeros[i]
-                end_idx = has_zeros[i + 1]
-
-                rnn_scores, hxs = self.gru(
-                    x[start_idx:end_idx],
-                    hxs * masks[start_idx].view(1, -1, 1))
-
-                outputs.append(rnn_scores)
-
-            # assert len(outputs) == T
-            # x is a (T, N, -1) tensor
-            x = torch.cat(outputs, dim=0)
-            # flatten
-            x = x.view(T * N, -1)
-            hxs = hxs.squeeze(0)
-
-        return x, hxs
-
-    def forward_old(self, x, hxs, masks):
-        x = self.flat_lin(x)
-        y, hxs = self._forward_gru(x, hxs, masks)
-
-        return y, hxs
 
     def forward_step(self, x, hxs, masks):
         x = self.flat_lin(x)
@@ -371,7 +307,7 @@ class RNNTransition(NoTransition):
 
 class CRNNTransition(NoTransition):
     def __init__(self, hidden_size, state_channels, recurse_depth):
-        super(CRNNTransition, self).__init__(hidden_size)
+        super(CRNNTransition, self).__init__(hidden_size, state_channels)
         self.state_channels = state_channels
         self.recurse_depth = recurse_depth
         self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
@@ -416,7 +352,7 @@ class CRNNTransition(NoTransition):
 
 
 class RecurrentPolicy(nn.Module):
-    def __init__(self, obs_shape, action_space, architecture, hidden_size, recurse_depth):
+    def __init__(self, obs_shape, action_space, architecture, state_channels, hidden_size, recurse_depth=1):
         super(RecurrentPolicy, self).__init__()
 
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain('relu'))
@@ -433,7 +369,7 @@ class RecurrentPolicy(nn.Module):
             self.encoder = nn.Sequential(
                 init_(nn.Conv2d(num_inputs, 32, 8, stride=4)), nn.ReLU(),
                 init_(nn.Conv2d(32, 64, 4, stride=2)), nn.ReLU(),
-                init_(nn.Conv2d(64, 32, 3, stride=1)), nn.ReLU(),
+                init_(nn.Conv2d(64, state_channels, 3, stride=1)), nn.ReLU(),
             )
         elif im_size == 64:
             self.encoder = nn.Sequential(
@@ -442,18 +378,18 @@ class RecurrentPolicy(nn.Module):
                 # input (3, 16, 16)
                 init_(nn.Conv2d(32, 64, 4, stride=2, padding=2)), nn.ReLU(),
                 # input (3, 9, 9)
-                init_(nn.Conv2d(64, 32, 3, stride=1)), nn.ReLU(),
+                init_(nn.Conv2d(64, state_channels, 3, stride=1)), nn.ReLU(),
                 # input (3, 7, 7)
             )
         else:
             raise NotImplementedError
 
         if architecture == "ff":
-            self.transition = NoTransition(hidden_size)
+            self.transition = NoTransition(hidden_size, state_channels=state_channels)
         elif architecture == "rnn":
-            self.transition = RNNTransition(hidden_size, recurse_depth=recurse_depth)
+            self.transition = RNNTransition(hidden_size, state_channels=state_channels, recurse_depth=recurse_depth)
         elif architecture == "crnn":
-            self.transition = CRNNTransition(hidden_size, state_channels=32, recurse_depth=recurse_depth)
+            self.transition = CRNNTransition(hidden_size, state_channels=state_channels, recurse_depth=recurse_depth)
         else:
             raise NotImplementedError
 

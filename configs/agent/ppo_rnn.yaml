@@ -1,18 +1,24 @@
 agent:
-  name: a2c
+  name: ppo
   num_envs: 16
-  architecture: "rnn"
-  recurse_depth: 3
-  lr: 7e-4
+  network:
+    architecture: "rnn"
+    recurse_depth: 1
+    state_channels: 32
+    hidden_size: 512
+  lr: 2.5e-4
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
   num_steps: 25
+  num_mini_batch: 4
   num_env_steps: 1e7
   eps: 1e-5
   alpha: 0.99
   max_grad_norm: 0.5
+  clip_param: 0.1
+  ppo_epoch: 4
   device: ${device}
-  use_gae: false
+  use_gae: true
   gae_lambda: 0.95
   use_proper_time_limits: False
