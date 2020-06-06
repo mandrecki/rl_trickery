@@ -3,7 +3,7 @@ agent:
   num_envs: 16
   network:
     architecture: "crnn"
-    recurse_depth: 1
+    recurse_depth: 3
     state_channels: 32
     hidden_size: 512
     stack_depth: 1
