@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian
 from a2c_ppo_acktr.utils import init
 
+from rl_trickery.models.conv_lstm import ConvLSTMCell
 
 class Flatten(nn.Module):
     def forward(self, x):
@@ -255,19 +256,15 @@ class NoTransition(nn.Module):
         return x, rnn_state
 
 
-class RNNTransition(nn.Module):
+class RNNTransition(NoTransition):
     def __init__(self, hidden_size, recurse_depth):
-        super(RNNTransition, self).__init__()
+        super(RNNTransition, self).__init__(hidden_size)
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
                                nn.init.calculate_gain('relu'))
         self.recurse_depth = recurse_depth
         self.recurrent_hidden_state_size = hidden_size
-        self.flat_lin = nn.Sequential(
-                Flatten(),
-                init_(nn.Linear(32 * 7 * 7, hidden_size)),
-                nn.ReLU()
-        )
-        self.gru = nn.GRU(hidden_size, hidden_size)
+        # self.gru = nn.GRU(hidden_size, hidden_size)
+        self.gru = nn.GRUCell(hidden_size, hidden_size, bias=True)
         for name, param in self.gru.named_parameters():
             if 'bias' in name:
                 nn.init.constant_(param, 0)
@@ -280,6 +277,7 @@ class RNNTransition(nn.Module):
             x = x.squeeze(0)
             hxs = hxs.squeeze(0)
         else:
+            print("here")
             # x is a (T, N, -1) tensor that has been flatten to (T * N, -1)
             N = hxs.size(0)
             T = int(x.size(0) / N)
@@ -331,28 +329,91 @@ class RNNTransition(nn.Module):
 
         return x, hxs
 
-    def forward(self, x, hxs, masks):
+    def forward_old(self, x, hxs, masks):
         x = self.flat_lin(x)
-        for i in range(self.recurse_depth):
-            y, hxs = self._forward_gru(x, hxs, masks)
-            masks = 1 - (0*masks)
+        y, hxs = self._forward_gru(x, hxs, masks)
 
         return y, hxs
 
-from .crnn import ConvLSTM
+    def forward_step(self, x, hxs, masks):
+        x = self.flat_lin(x)
 
-class CRNNTransition(nn.Module):
-    def __init__(self, hidden_size, recurse_depth):
-        super(CRNNTransition, self).__init__()
-        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
-                               nn.init.calculate_gain('relu'))
+        hxs = hxs * masks.view(-1, 1)
+        for i in range(self.recurse_depth):
+            hxs = self.gru(x, hxs)
+
+        return hxs, hxs
+
+    def forward_multistep(self, x, hxs, masks):
+        # num steps as first dimension
+        outs = []
+        for i in range(x.size(0)):
+            out, hxs = self.forward_step(x[i], hxs, masks[i])
+            outs.append(out)
+
+        outs = torch.cat(outs, dim=0)
+        return outs,  hxs
+
+    def forward(self, x, hxs, masks):
+        b = hxs.size(0)
+        t = int(x.size(0) / b)
+        masks = masks.view(t, b)
+        x_dims = x.size()[1:]
+
+        if t == 1:
+            x, hxs = self.forward_step(x, hxs, masks)
+        else:
+            x = x.view(t, b, *x_dims)
+            x, hxs = self.forward_multistep(x, hxs, masks)
+
+        return x, hxs
+
+
+class CRNNTransition(NoTransition):
+    def __init__(self, hidden_size, state_channels, recurse_depth):
+        super(CRNNTransition, self).__init__(hidden_size)
+        self.state_channels = state_channels
         self.recurse_depth = recurse_depth
-        self.recurrent_hidden_state_size = hidden_size
-        self.flat_lin = nn.Sequential(
-                Flatten(),
-                init_(nn.Linear(32 * 7 * 7, hidden_size)),
-                nn.ReLU()
-        )
+        self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
+        self.conv_lstm = ConvLSTMCell(input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True)
+
+    def forward_step(self, x, hxs, masks):
+        expansion_dims = ((hxs.dim() - 1) * (1,))
+        hxs = hxs * masks.view(-1, *expansion_dims)
+        hxs = hxs.split(self.state_channels, dim=1)
+
+        for i in range(self.recurse_depth):
+            h, c = self.conv_lstm(x, hxs)
+            hxs = (h, c)
+
+        x = self.flat_lin(c)
+        hxs = torch.cat(hxs, dim=1)
+        return x, hxs
+
+    def forward_multistep(self, x, hxs, masks):
+        # num steps as first dimension
+        outs = []
+        for i in range(x.size(0)):
+            out, hxs = self.forward_step(x[i], hxs, masks[i])
+            outs.append(out)
+
+        outs = torch.cat(outs, dim=0)
+        return outs,  hxs
+
+    def forward(self, x, hxs, masks):
+        b = hxs.size(0)
+        t = int(x.size(0) / b)
+        masks = masks.view(t, b)
+        x_dims = x.size()[1:]
+
+        if t == 1:
+            x, hxs = self.forward_step(x, hxs, masks)
+        else:
+            x = x.view(t, b, *x_dims)
+            x, hxs = self.forward_multistep(x, hxs, masks)
+
+        return x, hxs
+
 
 class RecurrentPolicy(nn.Module):
     def __init__(self, obs_shape, action_space, architecture, hidden_size, recurse_depth):
@@ -390,10 +451,9 @@ class RecurrentPolicy(nn.Module):
         if architecture == "ff":
             self.transition = NoTransition(hidden_size)
         elif architecture == "rnn":
-            self.transition = RNNTransition(hidden_size, recurse_depth)
+            self.transition = RNNTransition(hidden_size, recurse_depth=recurse_depth)
         elif architecture == "crnn":
-            raise NotImplementedError
-            # self.transition = CRNNTransition(hidden_size)
+            self.transition = CRNNTransition(hidden_size, state_channels=32, recurse_depth=recurse_depth)
         else:
             raise NotImplementedError
 

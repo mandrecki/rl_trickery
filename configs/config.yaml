@@ -3,7 +3,6 @@ num_train_iters: 1
 num_seed_steps: 1000
 device: cuda:0
 seed: 1
-n_params: ???
 
 log_frequency_step: 1e3
 log_save_tb: true
@@ -15,9 +14,11 @@ defaults:
 #  - env: atari
   - env: mazelab
 #  - agent: a2c
-  - agent: a2c_recurrent
+#  - agent: a2c_recurrent
+#  - agent: a2c_conv_recurrent
 #  - agent: ppo
 #  - agent: ppo_recurrent
+  - agent: ppo_conv_recurrent
 
 # hydra configuration
 hydra:

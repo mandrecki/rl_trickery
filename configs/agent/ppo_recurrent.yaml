@@ -1,7 +1,11 @@
 agent:
   name: ppo
   num_envs: 16
-  recurrent_policy: true
+  network: 0
+  architecture: "rnn"
+  recurse_depth: 3
+  state_channels: 32
+  hidden_size: 512
   lr: 2.5e-4
   gamma: 0.99
   value_loss_coef: 0.5

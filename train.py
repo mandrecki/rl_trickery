@@ -24,6 +24,7 @@ import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
 from rl_trickery.envs import make_envs
+from rl_trickery.data.storage import RolloutStorage
 
 # torch.backends.cudnn.benchmark = True
 
@@ -59,13 +60,7 @@ class Workspace(object):
             hidden_size=512,
             recurse_depth=cfg.agent.recurse_depth
         )
-        # self.net = Policy(
-        #     self.env.observation_space.shape,
-        #     self.env.action_space,
-        #     base_kwargs={'recurrent': cfg.agent.recurrent_policy}
-        # )
         self.net.to(self.device)
-        self.cfg.n_params = utils.get_n_params(self.net)
 
         if cfg.agent.name == 'a2c':
             self.agent = A2C_ACKTR(
@@ -115,7 +110,9 @@ class Workspace(object):
         eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
         obs = self.eval_envs.reset()
         eval_recurrent_hidden_states = torch.zeros(
-            self.cfg.env.num_envs, self.net.recurrent_hidden_state_size, device=self.device
+            self.cfg.env.num_envs,
+            *np.atleast_1d(self.net.recurrent_hidden_state_size),
+            device=self.device
         )
         eval_masks = torch.zeros(self.cfg.env.num_envs, 1, device=self.device)
 
