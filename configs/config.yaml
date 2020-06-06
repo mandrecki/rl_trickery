@@ -1,8 +1,9 @@
-num_train_steps: ${agent.num_env_steps}
+num_train_steps: 5e6
 num_train_iters: 1
-num_seed_steps: 1000
 device: cuda:0
-seed: 1
+seed: 127
+num_env_steps: 5e6
+num_envs: ${agent.num_envs}
 
 log_frequency_step: 1e3
 log_save_tb: true

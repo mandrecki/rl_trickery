@@ -1,7 +1,6 @@
 env:
 #  env_id: PongNoFrameskip-v4
   env_id: BreakoutNoFrameskip-v4
-  num_envs: ${agent.num_envs}
   image_size: 84
   to_grayscale: true
   episode_life: true

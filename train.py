@@ -46,11 +46,13 @@ class Workspace(object):
 
         self.env = make_envs(
             **cfg.env,
+            num_envs=cfg.num_envs,
             seed=self.cfg.seed
         )
 
         self.eval_envs = make_envs(
             **self.cfg.env,
+            num_envs=1,
             seed=self.cfg.seed+1337,
         )
         self.net = RecurrentPolicy(
@@ -92,7 +94,7 @@ class Workspace(object):
 
         self.rollouts = RolloutStorage(
             cfg.agent.num_steps,
-            cfg.env.num_envs,
+            cfg.num_envs,
             self.env.observation_space.shape,
             self.env.action_space,
             self.net.recurrent_hidden_state_size
@@ -107,11 +109,11 @@ class Workspace(object):
         eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
         obs = self.eval_envs.reset()
         eval_recurrent_hidden_states = torch.zeros(
-            self.cfg.env.num_envs,
+            1,
             *np.atleast_1d(self.net.recurrent_hidden_state_size),
             device=self.device
         )
-        eval_masks = torch.zeros(self.cfg.env.num_envs, 1, device=self.device)
+        eval_masks = torch.zeros(1, 1, device=self.device)
 
         batched_obs_seq = []
         self.video_recorder.init()
@@ -144,7 +146,7 @@ class Workspace(object):
 
     def run(self):
         episode_rewards = deque(maxlen=30)
-        timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.env.num_envs * self.cfg.env.frame_skip)
+        timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.num_envs * self.cfg.env.frame_skip)
         num_updates = int(self.cfg.num_train_steps // timesteps_per_update)
         total_episodes = 0
 

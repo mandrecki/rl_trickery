@@ -352,7 +352,7 @@ class CRNNTransition(NoTransition):
 
 
 class RecurrentPolicy(nn.Module):
-    def __init__(self, obs_shape, action_space, architecture, state_channels, hidden_size, recurse_depth=1):
+    def __init__(self, obs_shape, action_space, architecture, state_channels, hidden_size, recurse_depth=1, **kwargs):
         super(RecurrentPolicy, self).__init__()
 
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain('relu'))
