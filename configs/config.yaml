@@ -25,3 +25,6 @@ hydra:
   name: ${env.env_id}
   run:
     dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+  sweep:
+    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}_${hydra.job.num}
