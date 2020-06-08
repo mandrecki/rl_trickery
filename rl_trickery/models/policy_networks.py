@@ -323,9 +323,12 @@ class CRNNTransition(NoTransition):
         hxs = hxs.split(self.state_channels, dim=1)
         (h, c) = hxs
 
-        for i in range(self.recurse_depth):
-            h, c = self.conv_lstm(x, hxs)
-            hxs = (h, c)
+        if self.recurse_depth > 0:
+            for i in range(self.recurse_depth):
+                h, c = self.conv_lstm(x, hxs)
+                hxs = (h, c)
+        else:
+            h = x
 
         x = self.flat_lin(h)
         hxs = torch.cat(hxs, dim=1)
