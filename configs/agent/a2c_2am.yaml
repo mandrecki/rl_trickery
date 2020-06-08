@@ -1,0 +1,22 @@
+agent:
+  name: a2c_2am
+  num_envs: 16
+  network:
+    architecture: "crnn"
+    recurse_depth: 1
+    state_channels: 32
+    hidden_size: 512
+    pool_inject: false
+    rnn_type: lstm
+  lr: 7e-4
+  gamma: 0.99
+  value_loss_coef: 0.5
+  entropy_coef: 0.01
+  num_steps: 10
+  eps: 1e-5
+  alpha: 0.99
+  max_grad_norm: 0.5
+  device: ${device}
+  use_gae: false
+  gae_lambda: 0.95
+  use_proper_time_limits: False
