@@ -56,16 +56,19 @@ class Workspace(object):
             num_envs=1,
             seed=self.cfg.seed+1337,
         )
-        # self.net = RecurrentPolicy(
-        #     self.env.observation_space.shape,
-        #     self.env.action_space,
-        #     **cfg.agent.network,
-        # )
-        self.net = PolicyNetwork2AM(
-            self.env.observation_space.shape,
-            self.env.action_space,
-            **cfg.agent.network,
-        )
+
+        if self.cfg.agent.name == "a2c_2am":
+            self.net = PolicyNetwork2AM(
+                self.env.observation_space.shape,
+                self.env.action_space,
+                **cfg.agent.network,
+            )
+        else:
+            self.net = RecurrentPolicy(
+                self.env.observation_space.shape,
+                self.env.action_space,
+                **cfg.agent.network,
+            )
         self.net.to(self.device)
 
         if cfg.agent.name == 'a2c':
@@ -110,21 +113,22 @@ class Workspace(object):
         else:
             raise NameError
 
-        # self.rollouts = RolloutStorage(
-        #     cfg.agent.num_steps,
-        #     cfg.num_envs,
-        #     self.env.observation_space.shape,
-        #     self.env.action_space,
-        #     self.net.recurrent_hidden_state_size
-        # )
-
-        self.rollouts = RolloutStorage2AM(
-            cfg.agent.num_steps,
-            cfg.num_envs,
-            self.env.observation_space.shape,
-            self.env.action_space,
-            self.net.recurrent_hidden_state_size
-        )
+        if self.cfg.agent.name == "a2c_2am":
+            self.rollouts = RolloutStorage2AM(
+                cfg.agent.num_steps,
+                cfg.num_envs,
+                self.env.observation_space.shape,
+                self.env.action_space,
+                self.net.recurrent_hidden_state_size
+            )
+        else:
+            self.rollouts = RolloutStorage(
+                cfg.agent.num_steps,
+                cfg.num_envs,
+                self.env.observation_space.shape,
+                self.env.action_space,
+                self.net.recurrent_hidden_state_size
+            )
         self.rollouts.to(self.device)
 
         self.video_recorder = VideoRecorder(
@@ -154,7 +158,8 @@ class Workspace(object):
                     # deterministic=True
                 )
                 # COG
-                action, action_cog = action
+                if self.cfg.agent.name == "a2c_2am":
+                    action, action_cog = action
 
             # Obser reward and next obs
             obs, _, done, infos = self.eval_envs.step(action)
@@ -190,9 +195,10 @@ class Workspace(object):
                         self.rollouts.recurrent_hidden_states[step],
                         self.rollouts.masks[step]
                     )
-                value, value_cog = value
-                action, action_cog = action
-                action_log_prob, action_cog_log_prob = action_log_prob
+                if self.cfg.agent.name == "a2c_2am":
+                    value, value_cog = value
+                    action, action_cog = action
+                    action_log_prob, action_cog_log_prob = action_log_prob
 
                 obs, reward, done, infos = self.env.step(action)
                 for info in infos:
@@ -210,11 +216,19 @@ class Workspace(object):
                     [[0.0] if 'bad_transition' in info.keys() else [1.0]
                      for info in infos]
                 )
-                self.rollouts.insert(
-                    obs, recurrent_hidden_states, action,
-                    action_log_prob, value, reward, masks, bad_masks,
-                    action_cog, action_cog_log_prob, value_cog
-                )
+
+                if self.cfg.agent.name == "a2c_2am":
+                    self.rollouts.insert(
+                        obs, recurrent_hidden_states, action,
+                        action_log_prob, value, reward, masks, bad_masks,
+                        action_cog, action_cog_log_prob, value_cog
+                    )
+                else:
+                    self.rollouts.insert(
+                        obs, recurrent_hidden_states, action,
+                        action_log_prob, value, reward, masks, bad_masks,
+                    )
+
 
             with torch.no_grad():
                 next_value = self.net.get_value(

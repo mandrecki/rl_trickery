@@ -3,7 +3,7 @@ agent:
   num_envs: 16
   network:
     architecture: "crnn"
-    recurse_depth: 2
+    recurse_depth: 1
     state_channels: 32
     hidden_size: 512
     pool_inject: false

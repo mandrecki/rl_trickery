@@ -90,13 +90,14 @@ class Maze(BaseMaze):
 
 
 class MazelabEnv(BaseEnv):
-    def __init__(self, maze_size, maze_kind, goal_fixed, maze_fixed, goal_reward, **kwargs):
+    def __init__(self, maze_size, maze_kind, goal_fixed, maze_fixed, goal_reward, wall_reward, **kwargs):
         super().__init__()
         self.size = maze_size
         self.kind = maze_kind
         self.maze_fixed = maze_fixed
         self.goal_fixed = goal_fixed
         self.goal_reward = goal_reward
+        self.wall_reward = wall_reward
 
         if self.maze_fixed and self.kind == "maze":
             file = pkg_resources.resource_filename("rl_trickery", "envs/mazes/raw_maze_{}.npy".format(int(self.size)))
@@ -118,14 +119,17 @@ class MazelabEnv(BaseEnv):
         current_position = self.maze.objects.agent.positions[0]
         new_position = [current_position[0] + motion[0], current_position[1] + motion[1]]
         valid = self._is_valid(new_position)
+        reward = 0.0
         if valid:
             self.maze.objects.agent.positions = [new_position]
+        else:
+            reward += -0.01 * int(self.wall_reward)
 
         if self._is_goal(new_position):
-            reward = int(self.goal_reward)
+            reward += 1.0 * int(self.goal_reward)
             done = True
         else:
-            reward = -0.01
+            reward += -0.01
             done = False
         return self.maze.to_rgb(), reward, done, {}
 
