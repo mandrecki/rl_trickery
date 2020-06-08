@@ -196,7 +196,8 @@ class Workspace(object):
             self.rollouts.after_update()
 
             total_num_steps = (j + 1) * timesteps_per_update
-            if j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
+            if j != 0 \
+                    and j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
                     and len(episode_rewards) > 1:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)

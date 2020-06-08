@@ -1,10 +1,10 @@
 import torch.nn as nn
 import torch
+import torch.nn.functional as F
 
 
 class ConvLSTMCell(nn.Module):
-
-    def __init__(self, input_dim, hidden_dim, kernel_size, bias):
+    def __init__(self, input_dim, hidden_dim, kernel_size, bias, pool_inject=False):
         """
         Initialize ConvLSTM cell.
         Parameters
@@ -28,19 +28,48 @@ class ConvLSTMCell(nn.Module):
         self.padding = kernel_size[0] // 2, kernel_size[1] // 2
         self.bias = bias
 
-        self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-                              out_channels=4 * self.hidden_dim,
-                              kernel_size=self.kernel_size,
-                              padding=self.padding,
-                              bias=self.bias)
+        self.pool_inject = pool_inject
+        if pool_inject:
+            in_channels = self.input_dim + self.hidden_dim + self.hidden_dim
+            # self.inject = nn.Linear(2*self.hidden_dim, self.hidden_dim)
+        else:
+            in_channels = self.input_dim + self.hidden_dim
+
+        self.conv = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=4 * self.hidden_dim,
+            kernel_size=self.kernel_size,
+            padding=self.padding,
+            bias=self.bias
+        )
 
     def forward(self, input_tensor, cur_state):
+        batch_size = input_tensor.shape[0]
+        im_size = input_tensor.shape[-2:]
         if cur_state is not None:
             h_cur, c_cur = cur_state
         else:
-            batch_size = input_tensor.shape[0]
-            im_size = input_tensor.shape[-2:]
             h_cur, c_cur = self.init_hidden(batch_size, im_size)
+
+        if self.pool_inject:
+            h_pool = F.max_pool2d(
+                h_cur, im_size, stride=None,
+                padding=0, dilation=1,
+                ceil_mode=False,
+                return_indices=False
+            )
+            h_cur = torch.cat([h_cur, h_pool.repeat(1, 1, *im_size)], dim=1)  # concatenate along channel axis
+            # h_pool = F.avg_pool2d(
+            #     h_cur, im_size, stride=None,
+            #     padding=0,
+            #     ceil_mode=False,
+            # )
+            # m = torch.cat([h_max.view(batch_size, -1), h_mean.view(batch_size, -1)], dim=1)  # concatenate along channel axis
+            # p = self.inject(m)
+            # p = torch.tanh(p)
+            # p = p.view(batch_size, -1, 1, 1).repeat(1, 1, *im_size)
+            # h_cur = torch.cat([h_cur, p], dim=1)  # concatenate along channel axis
+
 
         combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 

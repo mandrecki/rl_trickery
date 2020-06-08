@@ -277,8 +277,9 @@ class RNNTransition(NoTransition):
         hxs = hxs * masks.view(-1, 1)
         for i in range(self.recurse_depth):
             hxs = self.gru(x, hxs)
+            x = hxs
 
-        return hxs, hxs
+        return x, hxs
 
     def forward_multistep(self, x, hxs, masks):
         # num steps as first dimension
@@ -306,23 +307,27 @@ class RNNTransition(NoTransition):
 
 
 class CRNNTransition(NoTransition):
-    def __init__(self, hidden_size, state_channels, recurse_depth):
+    def __init__(self, hidden_size, state_channels, recurse_depth, pool_inject):
         super(CRNNTransition, self).__init__(hidden_size, state_channels)
         self.state_channels = state_channels
         self.recurse_depth = recurse_depth
         self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
-        self.conv_lstm = ConvLSTMCell(input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True)
+        self.conv_lstm = ConvLSTMCell(
+            input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
+            pool_inject=pool_inject
+        )
 
     def forward_step(self, x, hxs, masks):
         expansion_dims = ((hxs.dim() - 1) * (1,))
         hxs = hxs * masks.view(-1, *expansion_dims)
         hxs = hxs.split(self.state_channels, dim=1)
+        (h, c) = hxs
 
         for i in range(self.recurse_depth):
             h, c = self.conv_lstm(x, hxs)
             hxs = (h, c)
 
-        x = self.flat_lin(c)
+        x = self.flat_lin(h)
         hxs = torch.cat(hxs, dim=1)
         return x, hxs
 
@@ -352,7 +357,9 @@ class CRNNTransition(NoTransition):
 
 
 class RecurrentPolicy(nn.Module):
-    def __init__(self, obs_shape, action_space, architecture, state_channels, hidden_size, recurse_depth=1, **kwargs):
+    def __init__(self,
+                 obs_shape, action_space, architecture, state_channels, hidden_size,
+                 recurse_depth=1, pool_inject=False, **kwargs):
         super(RecurrentPolicy, self).__init__()
 
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain('relu'))
@@ -389,7 +396,11 @@ class RecurrentPolicy(nn.Module):
         elif architecture == "rnn":
             self.transition = RNNTransition(hidden_size, state_channels=state_channels, recurse_depth=recurse_depth)
         elif architecture == "crnn":
-            self.transition = CRNNTransition(hidden_size, state_channels=state_channels, recurse_depth=recurse_depth)
+            self.transition = CRNNTransition(
+                hidden_size, state_channels=state_channels,
+                recurse_depth=recurse_depth,
+                pool_inject=pool_inject
+            )
         else:
             raise NotImplementedError
 
