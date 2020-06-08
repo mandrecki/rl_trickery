@@ -89,7 +89,10 @@ class Workspace(object):
                 lr=cfg.agent.lr,
                 eps=cfg.agent.eps,
                 alpha=cfg.agent.alpha,
-                max_grad_norm=cfg.agent.max_grad_norm
+                max_grad_norm=cfg.agent.max_grad_norm,
+                long_horizon=cfg.agent.long_horizon,
+                cognition_cost=cfg.agent.cognition_cost,
+                cognitive_coef=cfg.agent.cognitive_coef,
             )
         elif cfg.agent.name == 'ppo':
             self.agent = PPO(
@@ -192,7 +195,7 @@ class Workspace(object):
             self.step = j
             start_time = time.time()
             for step in range(self.cfg.agent.num_steps):
-                timestep_count += self.cfg.agent.num_steps
+                timestep_count += self.cfg.num_envs
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.net.act(
                         self.rollouts.obs[step],
@@ -202,11 +205,11 @@ class Workspace(object):
                 if self.cfg.agent.name == "a2c_2am":
                     value, value_cog = value
                     action, action_cog = action
-                    timestep_count -= (1-action_cog).sum()
                     action_log_prob, action_cog_log_prob = action_log_prob
-                    pause_action = action.clone()
-                    pause_action[action_cog == 0] = 127
-                    obs, reward, done, infos = self.env.step(pause_action)
+                    pausable_action = action.clone()
+                    pausable_action[action_cog == 0] = 127
+                    timestep_count -= (1-action_cog).sum()
+                    obs, reward, done, infos = self.env.step(pausable_action)
                 else:
                     obs, reward, done, infos = self.env.step(action)
                 for info in infos:
@@ -256,16 +259,18 @@ class Workspace(object):
                     and j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
                     and len(episode_rewards) > 1:
                 end_time = time.time()
-                self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)
-                self.logger.log('train/value', self.rollouts.value_preds.mean(), total_num_steps)
-                self.logger.log('train/act', self.rollouts.actions_cog.mean(), total_num_steps)
+                self.logger.log("train/episode_reward", np.mean(episode_rewards), self.step)
+                self.logger.log('train/value', self.rollouts.value_preds.mean(), self.step)
                 self.logger.log('train/episode', total_episodes, self.step)
                 self.logger.log('train/timestep', timestep_count, self.step)
                 self.logger.log('train/duration', end_time - start_time, self.step)
                 self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), self.step)
-                self.logger.log('train_loss/critic', value_loss, total_num_steps)
-                self.logger.log('train_loss/actor', action_loss, total_num_steps)
-                self.logger.log('train_loss/entropy', dist_entropy, total_num_steps)
+                self.logger.log('train_loss/critic', value_loss, self.step)
+                self.logger.log('train_loss/actor', action_loss, self.step)
+                self.logger.log('train_loss/entropy', dist_entropy, self.step)
+                if self.cfg.agent.name == "a2c_2am":
+                    self.logger.log('train/act', self.rollouts.actions_cog.mean(), self.step)
+
                 self.logger.dump(self.step)
 
             # if j != 0\

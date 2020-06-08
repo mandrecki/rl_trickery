@@ -12,11 +12,16 @@ class A2C_2AM():
                  eps=None,
                  alpha=None,
                  max_grad_norm=None,
-                 acktr=False):
+                 acktr=False,
+                 long_horizon=False,
+                 cognition_cost=-0.01,
+                 cognitive_coef=0.5
+                 ):
 
         assert not acktr
-
-        self.cognition_cost = -0.005
+        self.cognitive_coef = cognitive_coef
+        self.long_horizon = long_horizon
+        self.cognition_cost = cognition_cost
         self.gamma_cog = 0.99
 
         self.actor_critic = actor_critic
@@ -66,7 +71,8 @@ class A2C_2AM():
 
         returns_cog = self.compute_cognitive_returns(
             rollouts.value_cog_preds[-1],
-            advantages, rollouts.actions_cog
+            advantages, rollouts.actions_cog,
+            rollouts.masks[:-1].view(num_steps, num_processes, 1)
         )
         advantages_cog = returns_cog[:-1] - value_cog[-1]
         value_cog_loss = advantages_cog.pow(2).mean()
@@ -77,7 +83,7 @@ class A2C_2AM():
 
         self.optimizer.zero_grad()
 
-        (env_loss + 0.1*cog_loss).backward()
+        (env_loss + self.cognitive_coef*cog_loss).backward()
 
         nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
                                  self.max_grad_norm)
@@ -91,6 +97,7 @@ class A2C_2AM():
             next_value,
             advantages,
             a_cog,
+            masks
     ):
         with torch.no_grad():
             rewards = -a_cog * advantages.pow(2) + (1 - a_cog) * self.cognition_cost
@@ -99,7 +106,10 @@ class A2C_2AM():
             returns[-1] = next_value
             for step in reversed(range(rewards.size(0)-1)):
                 # if no env action taken (a_c = 0)
-                returns[step] = (1 - a_cog[step]) * self.gamma_cog * next_value + rewards[step]
+                if self.long_horizon:
+                    returns[step] = masks[step] * self.gamma_cog * next_value + rewards[step]
+                else:
+                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + rewards[step]
                 next_value = returns[step]
 
         return returns

@@ -19,4 +19,7 @@ agent:
   device: ${device}
   use_gae: false
   gae_lambda: 0.95
-  use_proper_time_limits: False
+  use_proper_time_limits: false
+  long_horizon: false
+  cognition_cost: -0.01
+  cognitive_coef: 0.5
