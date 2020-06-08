@@ -428,7 +428,8 @@ class RecurrentPolicy(nn.Module):
     def recurrent_hidden_state_size(self):
         if self.is_recurrent:
             return self.transition.recurrent_hidden_state_size
-        return 1
+        else:
+            return 1
 
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
@@ -463,5 +464,76 @@ class RecurrentPolicy(nn.Module):
 
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
+
+        return value, action_log_probs, dist_entropy, rnn_hxs
+
+
+class PolicyNetwork2AM(RecurrentPolicy):
+    def __init__(self,
+                 obs_shape, action_space, architecture, state_channels, hidden_size,
+                 recurse_depth=1, pool_inject=False, **kwargs):
+        super(PolicyNetwork2AM, self).__init__(obs_shape, action_space, architecture, state_channels, hidden_size,
+                 recurse_depth=1, pool_inject=pool_inject, **kwargs)
+        init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0))
+        self.critic_cog = init_(nn.Linear(self.hidden_size, 1))
+        self.actor_cog = Categorical(self.hidden_size, 2)
+        self.train()
+
+    def act(self, inputs, rnn_hxs, masks, deterministic=False):
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
+        dist = self.dist(x)
+
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
+
+        action_log_probs = dist.log_probs(action)
+
+        # compute cog variables
+        value_cog = self.critic_cog(x)
+        dist_cog = self.actor_cog(x)
+        action_cog = dist_cog.sample() if not deterministic else dist_cog.mode()
+        action_cog_log_probs = dist_cog.log_probs(action_cog)
+
+        value = value, value_cog
+        action = action, action_cog
+        action_log_probs = action_log_probs, action_cog_log_probs
+
+        return value, action, action_log_probs, rnn_hxs
+
+    def get_value(self, inputs, rnn_hxs, masks):
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
+
+        # value_cog = self.critic_cog(x)
+        # value = value, value_cog
+
+        return value
+
+    def evaluate_actions(self, inputs, rnn_hxs, masks, action):
+        action, action_cog = action
+
+        x = self.encoder(inputs / 255.0)
+        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        value = self.critic_linear(x)
+        dist = self.dist(x)
+
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
+
+        # compute cog variables
+        value_cog = self.critic_cog(x)
+        dist_cog = self.actor_cog(x)
+
+        action_cog_log_probs = dist_cog.log_probs(action_cog)
+        dist_entropy_cog = dist_cog.entropy().mean()
+
+        value = value, value_cog
+        action_log_probs = action_log_probs, action_cog_log_probs
+        dist_entropy = dist_entropy, dist_entropy_cog
 
         return value, action_log_probs, dist_entropy, rnn_hxs

@@ -14,9 +14,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # from a2c_ppo_acktr.model import Policy
-from rl_trickery.models.policy_networks import Policy, RecurrentPolicy
 from a2c_ppo_acktr.algo import PPO, A2C_ACKTR
-from a2c_ppo_acktr.storage import RolloutStorage
+# from a2c_ppo_acktr.storage import RolloutStorage
 
 
 import rl_trickery.envs
@@ -24,7 +23,9 @@ import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
 from rl_trickery.envs import make_envs
-from rl_trickery.data.storage import RolloutStorage
+from rl_trickery.models.policy_networks import Policy, RecurrentPolicy, PolicyNetwork2AM
+from rl_trickery.data.storage import RolloutStorage, RolloutStorage2AM
+from rl_trickery.agents.a2c_2am import A2C_2AM
 
 # torch.backends.cudnn.benchmark = True
 
@@ -55,7 +56,12 @@ class Workspace(object):
             num_envs=1,
             seed=self.cfg.seed+1337,
         )
-        self.net = RecurrentPolicy(
+        # self.net = RecurrentPolicy(
+        #     self.env.observation_space.shape,
+        #     self.env.action_space,
+        #     **cfg.agent.network,
+        # )
+        self.net = PolicyNetwork2AM(
             self.env.observation_space.shape,
             self.env.action_space,
             **cfg.agent.network,
@@ -64,6 +70,16 @@ class Workspace(object):
 
         if cfg.agent.name == 'a2c':
             self.agent = A2C_ACKTR(
+                self.net,
+                cfg.agent.value_loss_coef,
+                cfg.agent.entropy_coef,
+                lr=cfg.agent.lr,
+                eps=cfg.agent.eps,
+                alpha=cfg.agent.alpha,
+                max_grad_norm=cfg.agent.max_grad_norm
+            )
+        elif cfg.agent.name == 'a2c_2am':
+            self.agent = A2C_2AM(
                 self.net,
                 cfg.agent.value_loss_coef,
                 cfg.agent.entropy_coef,
@@ -91,8 +107,18 @@ class Workspace(object):
                 cfg.agent.entropy_coef,
                 acktr=True
             )
+        else:
+            raise NameError
 
-        self.rollouts = RolloutStorage(
+        # self.rollouts = RolloutStorage(
+        #     cfg.agent.num_steps,
+        #     cfg.num_envs,
+        #     self.env.observation_space.shape,
+        #     self.env.action_space,
+        #     self.net.recurrent_hidden_state_size
+        # )
+
+        self.rollouts = RolloutStorage2AM(
             cfg.agent.num_steps,
             cfg.num_envs,
             self.env.observation_space.shape,
@@ -127,6 +153,8 @@ class Workspace(object):
                     eval_masks,
                     # deterministic=True
                 )
+                # COG
+                action, action_cog = action
 
             # Obser reward and next obs
             obs, _, done, infos = self.eval_envs.step(action)
@@ -162,6 +190,9 @@ class Workspace(object):
                         self.rollouts.recurrent_hidden_states[step],
                         self.rollouts.masks[step]
                     )
+                value, value_cog = value
+                action, action_cog = action
+                action_log_prob, action_cog_log_prob = action_log_prob
 
                 obs, reward, done, infos = self.env.step(action)
                 for info in infos:
@@ -179,8 +210,11 @@ class Workspace(object):
                     [[0.0] if 'bad_transition' in info.keys() else [1.0]
                      for info in infos]
                 )
-                self.rollouts.insert(obs, recurrent_hidden_states, action,
-                                action_log_prob, value, reward, masks, bad_masks)
+                self.rollouts.insert(
+                    obs, recurrent_hidden_states, action,
+                    action_log_prob, value, reward, masks, bad_masks,
+                    action_cog, action_cog_log_prob, value_cog
+                )
 
             with torch.no_grad():
                 next_value = self.net.get_value(
