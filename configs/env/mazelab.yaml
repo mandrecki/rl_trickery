@@ -12,6 +12,7 @@ env:
   episode_life: false
   clip_rewards: false
   augment: false
+  mind_pause: true
   frame_stack: 1
   frame_skip: 1
   random_initial_steps: 0

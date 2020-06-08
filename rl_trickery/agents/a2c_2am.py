@@ -16,7 +16,7 @@ class A2C_2AM():
 
         assert not acktr
 
-        self.cognition_cost = 0.01
+        self.cognition_cost = -0.005
         self.gamma_cog = 0.99
 
         self.actor_critic = actor_critic
@@ -52,13 +52,15 @@ class A2C_2AM():
         action_cog_log_probs = action_cog_log_probs.view(num_steps, num_processes, 1)
 
         advantages = rollouts.returns[:-1] - values
-        value_loss = advantages.pow(2).mean()
+        # value_loss = advantages.pow(2).mean()
 
         # apply only where actions where taken
-        env_steps = rollouts.actions_cog == 1
-        action_loss = -(advantages[env_steps].detach() * action_log_probs[env_steps]).mean()
+        env_actions_idx = rollouts.actions_cog == 1
+        # action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
+        value_loss = advantages[env_actions_idx].pow(2).mean()
+        action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
         # extract loss while entropy is a series
-        # dist_entropy = dist_entropy[env_steps]
+        # dist_entropy = dist_entropy[env_actions_idx]
         env_loss = (value_loss * self.value_loss_coef + action_loss -
                     dist_entropy * self.entropy_coef)
 
@@ -75,7 +77,7 @@ class A2C_2AM():
 
         self.optimizer.zero_grad()
 
-        env_loss.backward()
+        (env_loss + 0.1*cog_loss).backward()
 
         nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
                                  self.max_grad_norm)
@@ -91,7 +93,7 @@ class A2C_2AM():
             a_cog,
     ):
         with torch.no_grad():
-            rewards = (1 - a_cog) * advantages.pow(2) - a_cog * self.cognition_cost
+            rewards = -a_cog * advantages.pow(2) + (1 - a_cog) * self.cognition_cost
             returns = torch.zeros_like(rewards)
 
             returns[-1] = next_value

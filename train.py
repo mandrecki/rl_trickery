@@ -160,6 +160,7 @@ class Workspace(object):
                 # COG
                 if self.cfg.agent.name == "a2c_2am":
                     action, action_cog = action
+                    action[action_cog == 0] = 127
 
             # Obser reward and next obs
             obs, _, done, infos = self.eval_envs.step(action)
@@ -185,10 +186,13 @@ class Workspace(object):
 
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(obs)
+
+        timestep_count = 0
         for j in range(num_updates):
             self.step = j
             start_time = time.time()
             for step in range(self.cfg.agent.num_steps):
+                timestep_count += self.cfg.agent.num_steps
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.net.act(
                         self.rollouts.obs[step],
@@ -198,9 +202,13 @@ class Workspace(object):
                 if self.cfg.agent.name == "a2c_2am":
                     value, value_cog = value
                     action, action_cog = action
+                    timestep_count -= (1-action_cog).sum()
                     action_log_prob, action_cog_log_prob = action_log_prob
-
-                obs, reward, done, infos = self.env.step(action)
+                    pause_action = action.clone()
+                    pause_action[action_cog == 0] = 127
+                    obs, reward, done, infos = self.env.step(pause_action)
+                else:
+                    obs, reward, done, infos = self.env.step(action)
                 for info in infos:
                     if 'episode' in info.keys():
                         episode_rewards.append(info['episode']['r'])
@@ -249,10 +257,10 @@ class Workspace(object):
                     and len(episode_rewards) > 1:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), total_num_steps)
-                # self.logger.log('train/batch_return', self.rollouts.returns.mean(), total_num_steps)
                 self.logger.log('train/value', self.rollouts.value_preds.mean(), total_num_steps)
+                self.logger.log('train/act', self.rollouts.actions_cog.mean(), total_num_steps)
                 self.logger.log('train/episode', total_episodes, self.step)
-                self.logger.log('train/timestep', total_num_steps, self.step)
+                self.logger.log('train/timestep', timestep_count, self.step)
                 self.logger.log('train/duration', end_time - start_time, self.step)
                 self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), self.step)
                 self.logger.log('train_loss/critic', value_loss, total_num_steps)

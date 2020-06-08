@@ -164,6 +164,32 @@ class RandomResetSteps(gym.Wrapper):
         return obs
 
 
+class PauseWrapper(gym.Wrapper):
+    def __init__(self, env, special_value=127):
+        super(PauseWrapper, self).__init__(env)
+        self.obs = None
+        self.rew = 0
+        self.done = False
+        self.info = {}
+        self.special_value = special_value
+        assert env.action_space.__class__.__name__ == "Discrete"
+
+    def step(self, action):
+        if action != self.special_value:
+            self.obs, self.rew, self.done, self.info = self.env.step(action)
+        else:
+            self.rew = 0
+            self.info = {}
+
+        return self.obs, self.rew, self.done, self.info
+
+    def reset(self):
+        self.obs = self.env.reset()
+        self.rew = 0
+        self.done = False
+        self.info = {}
+        return self.obs
+
 
 class VecPyTorch(VecEnvWrapper):
     def __init__(self, venv, device):

@@ -8,7 +8,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
 
 from .wrappers import ToImageObservation, CropImage, ResizeImage, RandomPadCropImage,\
-    ScaleImage, StepSkipEnv, RandomResetSteps, TransposeImage, VecPyTorch, \
+    ScaleImage, StepSkipEnv, PauseWrapper, RandomResetSteps, TransposeImage, VecPyTorch, \
     VecPyTorchFrameStack, wrap_deepmind_modified
 
 
@@ -45,6 +45,7 @@ def make_env(
         image_size=84,
         frame_skip=1,
         augment=False,
+        mind_pause=False,
         random_initial_steps=0,
         **kwargs
 ):
@@ -94,6 +95,9 @@ def make_env(
 
     if augment:
         env = RandomPadCropImage(env)
+
+    if mind_pause:
+        env = PauseWrapper(env)
 
     if pytorch_dim_order:
         env = TransposeImage(env)
