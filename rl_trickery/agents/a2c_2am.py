@@ -100,16 +100,21 @@ class A2C_2AM():
             masks
     ):
         with torch.no_grad():
-            rewards = -a_cog * advantages.pow(2) + (1 - a_cog) * (-self.cognition_cost)
-            returns = torch.zeros_like(rewards)
+            # rewards = -a_cog * advantages.pow(2) + (1 - a_cog) * (-self.cognition_cost)
 
+            advantages2 = advantages.pow(2)
+            returns = torch.zeros_like(advantages)
             returns[-1] = next_value
-            for step in reversed(range(rewards.size(0)-1)):
+            for step in reversed(range(advantages2.size(0)-1)):
+                reward = (1 - a_cog[step]) * (torch.log(advantages2[step] + 1e-5)- torch.log(advantages2[step+1] + 1e-5) - self.cognition_cost)
+                # print((torch.log(advantages2[step]/advantages2[step+1]).mean()))
+                print(reward.mean())
+
                 # if no env action taken (a_c = 0)
                 if self.long_horizon:
-                    returns[step] = masks[step] * self.gamma_cog * next_value + rewards[step]
+                    returns[step] = masks[step] * self.gamma_cog * next_value + reward
                 else:
-                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + rewards[step]
+                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + reward
                 next_value = returns[step]
 
         return returns
