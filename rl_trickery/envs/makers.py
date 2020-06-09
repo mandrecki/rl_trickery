@@ -53,6 +53,7 @@ def make_env(
         augment=False,
         mind_pause=False,
         random_initial_steps=0,
+        max_timesteps=None,
         **kwargs
 ):
     env = gym.make(env_id, **env_kwargs)
@@ -83,7 +84,8 @@ def make_env(
         env = RandomResetSteps(env, random_initial_steps)
     if frame_skip > 1:
         env = StepSkipEnv(env, skip=frame_skip)
-    env = TimeLimit(env, max_episode_steps=600)
+    if max_timesteps:
+        env = TimeLimit(env, max_episode_steps=max_timesteps)
     env = bench.Monitor(env, filename=None, allow_early_resets=True)
     env = wrap_deepmind_modified(env, **kwargs)
 

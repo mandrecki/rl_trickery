@@ -1,6 +1,7 @@
 env:
 #  env_id: PongNoFrameskip-v4
   env_id: BreakoutNoFrameskip-v4
+#  env_id: IceHockeyNoFrameskip-v4
   image_size: 84
   to_grayscale: true
   episode_life: true
@@ -8,5 +9,6 @@ env:
   frame_stack: 4
   frame_skip: 4
   random_initial_steps: 5
+  max_timesteps: 1000
   pytorch_dim_order: true
   device: ${device}

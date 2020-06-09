@@ -8,12 +8,12 @@ log_frequency_step: 1e3
 log_save_tb: true
 save_video: true
 eval_frequency_step: 5e4
-num_eval_episodes: 1
+num_eval_episodes: 30
 
 defaults:
 #  - env: atari
-#  - env: mazelab
-  - env: tetris
+  - env: mazelab
+#  - env: tetris
 #  - agent: a2c
 #  - agent: a2c_rnn
   - agent: a2c_crnn
