@@ -20,6 +20,7 @@ agent:
   use_gae: false
   gae_lambda: 0.95
   use_proper_time_limits: false
-  long_horizon: false
-  cognition_cost: 0.05
-  cognitive_coef: 0.001
+  long_horizon: true
+  cognition_cost: 0.1
+  cognitive_coef: 0.1
+  only_action_values: true

@@ -15,13 +15,15 @@ class A2C_2AM():
                  acktr=False,
                  long_horizon=False,
                  cognition_cost=0.01,
-                 cognitive_coef=0.5
+                 cognitive_coef=0.5,
+                 only_action_values=True,
                  ):
 
         assert not acktr
         self.cognitive_coef = cognitive_coef
         self.long_horizon = long_horizon
         self.cognition_cost = cognition_cost
+        self.only_action_values = only_action_values
         self.gamma_cog = 0.99
 
         self.actor_critic = actor_critic
@@ -60,9 +62,10 @@ class A2C_2AM():
 
         # apply only where actions where taken
         env_actions_idx = rollouts.actions_cog == 1
-        # action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
-        # value_loss = advantages.pow(2).mean()
-        value_loss = advantages[env_actions_idx].pow(2).mean()
+        if self.only_action_values:
+            value_loss = advantages[env_actions_idx].pow(2).mean()
+        else:
+            value_loss = advantages.pow(2).mean()
         action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
         # extract loss while entropy is a series
         # dist_entropy = dist_entropy[env_actions_idx]
@@ -106,9 +109,9 @@ class A2C_2AM():
             returns = torch.zeros_like(advantages)
             returns[-1] = next_value
             for step in reversed(range(advantages2.size(0)-1)):
-                reward = (1 - a_cog[step]) * (torch.log(advantages2[step] + 1e-5)- torch.log(advantages2[step+1] + 1e-5) - self.cognition_cost)
+                reward = (1 - a_cog[step]) * (torch.log2(advantages2[step] + 1e-5) - torch.log2(advantages2[step+1] + 1e-5) - self.cognition_cost)
                 # print((torch.log(advantages2[step]/advantages2[step+1]).mean()))
-                print(reward.mean())
+                # print(reward.mean())
 
                 # if no env action taken (a_c = 0)
                 if self.long_horizon:

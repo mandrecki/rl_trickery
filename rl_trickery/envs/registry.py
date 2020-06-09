@@ -2,7 +2,7 @@ import gym
 from .maze import MazelabEnv
 
 gym.envs.register(
-    id="Mazelab-v0", entry_point=MazelabEnv)
+    id="Mazelab-v0", entry_point=MazelabEnv, max_episode_steps=400)
 
 env_name = "Mazelab{}-v{}"
 for size in [8, 12, 16, 32]:
@@ -29,7 +29,7 @@ for size in [8, 12, 16, 32]:
         })
 
     gym.envs.register(
-        id=env_name.format(size, 3), entry_point=MazelabEnv,
+        id=env_name.format(size, 3), entry_point=MazelabEnv, max_episode_steps=500,
         kwargs={
             "kind": "random",
             "fixed": True,
@@ -37,7 +37,7 @@ for size in [8, 12, 16, 32]:
         })
 
     gym.envs.register(
-        id=env_name.format(size, 4), entry_point=MazelabEnv,
+        id=env_name.format(size, 4), entry_point=MazelabEnv, max_episode_steps=500,
         kwargs={
             "kind": "random",
             "fixed": False,
@@ -46,7 +46,7 @@ for size in [8, 12, 16, 32]:
         })
 
     gym.envs.register(
-        id=env_name.format(size, 5), entry_point=MazelabEnv,
+        id=env_name.format(size, 5), entry_point=MazelabEnv, max_episode_steps=500,
         kwargs={
             "kind": "random",
             "fixed": False,

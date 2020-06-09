@@ -1,15 +1,15 @@
-num_train_steps: 2e6
+num_train_steps: 5e6
 num_train_iters: 1
-#device: cuda:0
-device: cpu
-seed: 127
+device: cuda:0
+#device: cpu
+seed: 129
 num_envs: ${agent.num_envs}
 
-log_frequency_step: 20
+log_frequency_step: 1e2
 log_save_tb: true
 save_video: true
-eval_frequency_step: 5e4
-num_eval_episodes: 1
+eval_frequency_step: 1e4
+num_eval_episodes: 32
 
 defaults:
 #  - env: atari

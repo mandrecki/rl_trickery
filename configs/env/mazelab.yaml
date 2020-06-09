@@ -2,12 +2,12 @@ env:
   env_id: Mazelab-v0
   env_kwargs:
     maze_kind: maze
-    maze_size: 7
+    maze_size: 13
     maze_fixed: false
     goal_fixed: false
     goal_reward: false
     wall_reward: false
-  max_timesteps: 500
+  max_timesteps: 400
   image_size: 64
   to_grayscale: false
   episode_life: false

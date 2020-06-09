@@ -79,7 +79,8 @@ def make_env(
         env = JoypadSpace(env, SIMPLE_MOVEMENT)
 
     env.seed(seed)
-
+    # if max_timesteps:
+    #     env = TimeLimit(env, max_episode_steps=max_timesteps)
     if random_initial_steps > 0:
         env = RandomResetSteps(env, random_initial_steps)
     if frame_skip > 1:
