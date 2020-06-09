@@ -1,4 +1,4 @@
-num_train_steps: 1e6
+num_train_steps: 2e6
 num_train_iters: 1
 device: cuda:0
 seed: 127
@@ -8,15 +8,16 @@ log_frequency_step: 1e3
 log_save_tb: true
 save_video: true
 eval_frequency_step: 5e4
-num_eval_episodes: 30
+num_eval_episodes: 1
 
 defaults:
 #  - env: atari
-  - env: mazelab
+#  - env: mazelab
+  - env: tetris
 #  - agent: a2c
 #  - agent: a2c_rnn
-#  - agent: a2c_crnn
-  - agent: a2c_2am
+  - agent: a2c_crnn
+#  - agent: a2c_2am
 #  - agent: ppo
 #  - agent: ppo_rnn
 #  - agent: ppo_crnn

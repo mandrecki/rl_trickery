@@ -1,4 +1,9 @@
 import gym
+import gym_tetris
+from gym_tetris.actions import SIMPLE_MOVEMENT
+from nes_py.wrappers import JoypadSpace
+from gym.wrappers import TimeLimit
+
 import numpy as np
 
 from baselines.common.vec_env import DummyVecEnv, VecEnvWrapper, SubprocVecEnv
@@ -34,6 +39,7 @@ UPSCALE_ENVS = [
 ]
 
 CROP_ENVS = {
+    "TetrisA-v2": (45, 211, 93, 178),  # only blocks visible
 }
 
 
@@ -68,6 +74,8 @@ def make_env(
             camera_id=camera_id,
             channels_first=False
         )
+    elif env_id == "TetrisA-v2":
+        env = JoypadSpace(env, SIMPLE_MOVEMENT)
 
     env.seed(seed)
 
@@ -75,6 +83,7 @@ def make_env(
         env = RandomResetSteps(env, random_initial_steps)
     if frame_skip > 1:
         env = StepSkipEnv(env, skip=frame_skip)
+    env = TimeLimit(env, max_episode_steps=600)
     env = bench.Monitor(env, filename=None, allow_early_resets=True)
     env = wrap_deepmind_modified(env, **kwargs)
 

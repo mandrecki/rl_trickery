@@ -1,5 +1,6 @@
 
 gym
+gym_tetris
 hydra-core
 imageio-ffmpeg
 jupyter

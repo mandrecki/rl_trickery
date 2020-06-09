@@ -195,7 +195,7 @@ class Workspace(object):
             self.step = j
             start_time = time.time()
             for step in range(self.cfg.agent.num_steps):
-                timestep_count += self.cfg.num_envs
+                timestep_count += self.cfg.num_envs * self.cfg.env.frame_skip
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.net.act(
                         self.rollouts.obs[step],
