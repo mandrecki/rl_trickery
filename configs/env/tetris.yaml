@@ -1,0 +1,13 @@
+env:
+  env_id: TetrisA-v2
+  image_size: 64
+  to_grayscale: true
+  episode_life: false
+  clip_rewards: false
+  augment: false
+  mind_pause: true
+  frame_stack: 1
+  frame_skip: 8
+  random_initial_steps: 0
+  pytorch_dim_order: true
+  device: ${device}
