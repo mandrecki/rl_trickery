@@ -12,7 +12,7 @@ agent:
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
-  num_steps: 10
+  num_steps: 20
   eps: 1e-5
   alpha: 0.99
   max_grad_norm: 0.5
@@ -21,6 +21,6 @@ agent:
   gae_lambda: 0.95
   use_proper_time_limits: false
   long_horizon: true
-  cognition_cost: 0.1
-  cognitive_coef: 0.1
-  only_action_values: true
+  cognition_cost: 0.25
+  cognitive_coef: 0.05
+  only_action_values: false

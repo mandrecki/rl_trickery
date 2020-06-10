@@ -24,7 +24,7 @@ class A2C_2AM():
         self.long_horizon = long_horizon
         self.cognition_cost = cognition_cost
         self.only_action_values = only_action_values
-        self.gamma_cog = 0.99
+        self.gamma_cog = 0.9
 
         self.actor_critic = actor_critic
         self.acktr = acktr
@@ -66,22 +66,28 @@ class A2C_2AM():
             value_loss = advantages[env_actions_idx].pow(2).mean()
         else:
             value_loss = advantages.pow(2).mean()
-        action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
+        action_loss = -(advantages[rollouts.actions_cog == 1].detach() * action_log_probs[rollouts.actions_cog == 1]).mean()
+
         # extract loss while entropy is a series
         # dist_entropy = dist_entropy[env_actions_idx]
-        env_loss = (value_loss * self.value_loss_coef + action_loss -
-                    dist_entropy * self.entropy_coef)
+        if not torch.isnan(action_loss):
+            env_loss = (value_loss * self.value_loss_coef + action_loss -
+                        dist_entropy * self.entropy_coef)
+        else:
+            env_loss = (value_loss * self.value_loss_coef +
+                        dist_entropy * self.entropy_coef)
+
 
         returns_cog = self.compute_cognitive_returns(
             rollouts.value_cog_preds[-1],
             advantages, rollouts.actions_cog,
             rollouts.masks[:-1].view(num_steps, num_processes, 1)
         )
-        advantages_cog = returns_cog[:-1] - value_cog[-1]
+        advantages_cog = returns_cog[:-1] - value_cog[:-1]
         value_cog_loss = advantages_cog.pow(2).mean()
 
-        action_cog_loss = -(advantages_cog.detach() * action_cog_log_probs[:-1]).mean()
-        cog_loss = (value_cog_loss * self.value_loss_coef + action_cog_loss -
+        action_cog_loss = -(advantages_cog[1:].detach() * action_cog_log_probs[1:-1]).mean()
+        cog_loss = (value_cog_loss * 0.01 + action_cog_loss -
                     dist_entropy_cog * self.entropy_coef)
 
         self.optimizer.zero_grad()
@@ -93,7 +99,11 @@ class A2C_2AM():
 
         self.optimizer.step()
 
-        return value_loss.item(), action_loss.item(), dist_entropy.item()
+        value_loss = value_loss.item(), value_cog_loss.item()
+        action_loss = action_loss.item(), action_cog_loss.item()
+        dist_entropy = dist_entropy.item(), dist_entropy_cog.item()
+
+        return value_loss, action_loss, dist_entropy
 
     def compute_cognitive_returns(
             self,
@@ -109,15 +119,13 @@ class A2C_2AM():
             returns = torch.zeros_like(advantages)
             returns[-1] = next_value
             for step in reversed(range(advantages2.size(0)-1)):
-                reward = (1 - a_cog[step]) * (torch.log2(advantages2[step] + 1e-5) - torch.log2(advantages2[step+1] + 1e-5) - self.cognition_cost)
-                # print((torch.log(advantages2[step]/advantages2[step+1]).mean()))
-                # print(reward.mean())
+                value_accuracy = (torch.log2(advantages2[step] + 1e-5) - torch.log2(advantages2[step+1] + 1e-5)) - self.cognition_cost
 
                 # if no env action taken (a_c = 0)
                 if self.long_horizon:
-                    returns[step] = masks[step] * self.gamma_cog * next_value + reward
+                    returns[step] = masks[step] * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
                 else:
-                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + reward
+                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
                 next_value = returns[step]
 
         return returns

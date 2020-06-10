@@ -473,7 +473,7 @@ class PolicyNetwork2AM(RecurrentPolicy):
                  obs_shape, action_space, architecture, state_channels, hidden_size,
                  recurse_depth=1, pool_inject=False, **kwargs):
         super(PolicyNetwork2AM, self).__init__(obs_shape, action_space, architecture, state_channels, hidden_size,
-                 recurse_depth=1, pool_inject=pool_inject, **kwargs)
+                 recurse_depth=recurse_depth, pool_inject=pool_inject, **kwargs)
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0))
         self.critic_cog = init_(nn.Linear(self.hidden_size, 1))
         self.actor_cog = Categorical(self.hidden_size, 2)

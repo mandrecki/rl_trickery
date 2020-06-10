@@ -184,6 +184,8 @@ class Workspace(object):
 
     def run(self):
         episode_rewards = deque(maxlen=30)
+        episode_rewards.append(0)
+        episode_rewards.append(0)
         timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.num_envs * self.cfg.env.frame_skip)
         num_updates = int(self.cfg.num_train_steps // timesteps_per_update)
         total_episodes = 0
@@ -206,6 +208,8 @@ class Workspace(object):
                 if self.cfg.agent.name == "a2c_2am":
                     value, value_cog = value
                     action, action_cog = action
+                    if step == 0:
+                        action_cog.fill_(1)
                     action_log_prob, action_cog_log_prob = action_log_prob
                     pausable_action = action.clone()
                     pausable_action[action_cog == 0] = 127
@@ -253,12 +257,17 @@ class Workspace(object):
                                      self.cfg.agent.gae_lambda, self.cfg.agent.use_proper_time_limits)
 
             value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
+            if self.cfg.agent.name == "a2c_2am":
+                value_loss, value_cog_loss = value_loss
+                action_loss, action_cog_loss = action_loss
+                dist_entropy, dist_entropy_cog = dist_entropy
+
             self.rollouts.after_update()
 
             total_num_steps = (j + 1) * timesteps_per_update
             if j != 0 \
                     and j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
-                    and len(episode_rewards) > 1:
+                    and len(episode_rewards) > 0:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), self.step)
                 self.logger.log('train/value', self.rollouts.value_preds.mean(), self.step)
@@ -270,7 +279,11 @@ class Workspace(object):
                 self.logger.log('train_loss/actor', action_loss, self.step)
                 self.logger.log('train_loss/entropy', dist_entropy, self.step)
                 if self.cfg.agent.name == "a2c_2am":
+                    self.logger.log('train/value_cog', self.rollouts.value_cog_preds.mean(), self.step)
                     self.logger.log('train/act', self.rollouts.actions_cog.mean(), self.step)
+                    self.logger.log('train_loss/critic_cog', value_cog_loss, self.step)
+                    self.logger.log('train_loss/actor_cog', action_cog_loss, self.step)
+                    self.logger.log('train_loss/entropy_cog', dist_entropy_cog, self.step)
 
                 self.logger.dump(self.step)
 
