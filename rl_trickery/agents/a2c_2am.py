@@ -14,7 +14,7 @@ class A2C_2AM():
                  max_grad_norm=None,
                  acktr=False,
                  long_horizon=False,
-                 cognition_cost=0.01,
+                 cognition_cost=0.1,
                  cognitive_coef=0.5,
                  only_action_values=True,
                  ):
@@ -61,12 +61,11 @@ class A2C_2AM():
         advantages = rollouts.returns[:-1] - values
 
         # apply only where actions where taken
-        env_actions_idx = rollouts.actions_cog == 1
         if self.only_action_values:
-            value_loss = advantages[env_actions_idx].pow(2).mean()
+            value_loss = advantages[rollouts.actions_cog == 1].pow(2).mean()
         else:
             value_loss = advantages.pow(2).mean()
-        action_loss = -(advantages[env_actions_idx].detach() * action_log_probs[env_actions_idx]).mean()
+        action_loss = -(advantages[rollouts.actions_cog == 1].detach() * action_log_probs[rollouts.actions_cog == 1]).mean()
         # extract loss while entropy is a series
         # dist_entropy = dist_entropy[env_actions_idx]
         env_loss = (value_loss * self.value_loss_coef + action_loss -
@@ -77,7 +76,7 @@ class A2C_2AM():
             advantages, rollouts.actions_cog,
             rollouts.masks[:-1].view(num_steps, num_processes, 1)
         )
-        advantages_cog = returns_cog[:-1] - value_cog[-1]
+        advantages_cog = returns_cog[:-1] - value_cog[:-1]
         value_cog_loss = advantages_cog.pow(2).mean()
 
         action_cog_loss = -(advantages_cog.detach() * action_cog_log_probs[:-1]).mean()
@@ -104,7 +103,6 @@ class A2C_2AM():
     ):
         with torch.no_grad():
             # rewards = -a_cog * advantages.pow(2) + (1 - a_cog) * (-self.cognition_cost)
-
             advantages2 = advantages.pow(2)
             returns = torch.zeros_like(advantages)
             returns[-1] = next_value

@@ -151,7 +151,9 @@ class Workspace(object):
 
         batched_obs_seq = []
         self.video_recorder.init()
-        while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
+        for i in range(50000):
+            if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:
+                break
             batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
             # self.video_recorder.add_torch_obs(obs)
             with torch.no_grad():
