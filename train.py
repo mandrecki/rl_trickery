@@ -212,6 +212,7 @@ class Workspace(object):
                     action, action_cog = action
                     if step == 0:
                         action_cog.fill_(1)
+                    # action_cog.fill_(1)
                     action_log_prob, action_cog_log_prob = action_log_prob
                     pausable_action = action.clone()
                     pausable_action[action_cog == 0] = 127

@@ -301,7 +301,9 @@ class RolloutStorage2AM(object):
         # next_value -= self.rewards[-1] * (1 - self.actions_cog[-1])
         for step in reversed(range(self.rewards.size(0))):
             # gamma equal 1 if no env action taken (a_c = 0)
-            self.returns[step] = gamma**self.actions_cog[step].float() * next_value * self.masks[step + 1] \
-                                 + self.rewards[step]
-            next_value = self.returns[step] * self.actions_cog[step] + next_value * (1 - self.actions_cog[step])
+            value = self.actions_cog[step] * (gamma * next_value * self.masks[step + 1] + self.rewards[step])\
+                    + (1 - self.actions_cog[step]) * next_value
+            self.returns[step] = value
+            next_value = value
+
         pass
