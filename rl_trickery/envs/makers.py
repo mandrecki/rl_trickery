@@ -1,5 +1,7 @@
 import gym
 import gym_tetris
+import gym_ple
+import gym_minigrid
 from gym_tetris.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 from gym.wrappers import TimeLimit
