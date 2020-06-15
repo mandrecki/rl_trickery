@@ -30,7 +30,7 @@ class NoTransition(nn.Module):
         self.in_shape = np.atleast_1d(hidden_size)
         self.out_shape = np.atleast_1d(hidden_size)
 
-    def forward(self, x, rnn_state, masks, action_cog=None):
+    def forward(self, x, rnn_state, done, action_cog=None):
         return x, rnn_state
 
 
@@ -48,8 +48,8 @@ class RNNTransition(nn.Module):
             elif 'weight' in name:
                 nn.init.orthogonal_(param)
 
-    def forward(self, x, hxs, masks, action_cog=None):
-        hxs = hxs * masks.view(-1, 1)
+    def forward(self, x, hxs, done, action_cog=None):
+        hxs = hxs * (1 - done.view(-1, 1))
         hxs = self.gru(x, hxs)
         x = hxs
 
@@ -67,9 +67,9 @@ class CRNNTransition(nn.Module):
             input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
 
-    def forward(self, x, hxs, masks):
+    def forward(self, x, hxs, done):
         expansion_dims = ((hxs.dim() - 1) * (1,))
-        hxs = hxs * masks.view(-1, *expansion_dims)
+        hxs = hxs * (1 - done.view(-1, *expansion_dims))
         hxs = hxs.split(self.state_channels, dim=1)
 
         h, c = self.conv_lstm(x, hxs)
@@ -245,13 +245,10 @@ class RecursivePolicy(nn.Module):
         else:
             return (0,)
 
-    def forward(self, inputs, rnn_hxs, masks):
-        raise NotImplementedError
-
-    def act(self, inputs, rnn_hxs, masks, deterministic=False):
-        x = self.encoder(inputs / 255.0)
+    def act(self, obs, rnn_h, done, deterministic=False):
+        x = self.encoder(obs / 255.0)
         x = self.enc2trans(x)
-        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)
         value = self.ac_linear.forward_critic(x)
         dist = self.ac_linear.forward_actor(x)
@@ -264,25 +261,25 @@ class RecursivePolicy(nn.Module):
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
 
-        return value, action, action_log_probs, dist_entropy, rnn_hxs
+        return value, action, action_log_probs, dist_entropy, rnn_h
 
-    def get_value(self, inputs, rnn_hxs, masks):
-        x = self.encoder(inputs / 255.0)
+    def get_value(self, obs, rnn_h, done):
+        x = self.encoder(obs / 255.0)
         x = self.enc2trans(x)
-        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+        x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)
         value = self.ac_linear.forward_critic(x)
         return value
 
-    def evaluate_actions(self, inputs, rnn_hxs, masks, action):
-        x = self.encoder(inputs / 255.0)
-        x = self.enc2trans(x)
-        x, rnn_hxs = self.transition(x, rnn_hxs, masks)
-        x = self.trans2ac(x)
-        value = self.ac_linear.forward_critic(x)
-        dist = self.ac_linear.forward_actor(x)
-
-        action_log_probs = dist.log_probs(action)
-        dist_entropy = dist.entropy().mean()
-
-        return value, action_log_probs, dist_entropy, rnn_hxs
+    # def evaluate_actions(self, inputs, rnn_hxs, masks, action):
+    #     x = self.encoder(inputs / 255.0)
+    #     x = self.enc2trans(x)
+    #     x, rnn_hxs = self.transition(x, rnn_hxs, masks)
+    #     x = self.trans2ac(x)
+    #     value = self.ac_linear.forward_critic(x)
+    #     dist = self.ac_linear.forward_actor(x)
+    #
+    #     action_log_probs = dist.log_probs(action)
+    #     dist_entropy = dist.entropy().mean()
+    #
+    #     return value, action_log_probs, dist_entropy, rnn_hxs
