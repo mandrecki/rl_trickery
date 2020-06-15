@@ -27,7 +27,7 @@ from rl_trickery.agents.tricky_agents import A2C, TrickyRollout
 class Workspace(object):
     def __init__(self, cfg):
         self.work_dir = os.getcwd()
-        print(f'workspace: {self.work_dir}')
+        # print(f'workspace: {self.work_dir}')
 
         self.cfg = cfg
         # init loggers
@@ -78,11 +78,42 @@ class Workspace(object):
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
 
+    def evaluate(self, step):
+        eval_episode_rewards = deque()
+        obs = self.eval_envs.reset()
+        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
+        done = torch.zeros((self.env.num_envs, 1)).to(self.device)
+        batched_obs_seq = []
+        for i in range(50000):
+            if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:
+                break
+
+            if len(self.env.observation_space.shape) == 3:
+                batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
+
+            with torch.no_grad():
+                _, action, _, _, rnn_h = self.net.act(obs, rnn_h, done)
+
+            obs, _, done, infos = self.eval_envs.step(action)
+
+            for info in infos:
+                if 'episode' in info.keys():
+                    eval_episode_rewards.append(info['episode']['r'])
+
+        if len(self.env.observation_space.shape) == 3:
+            self.video_recorder.init()
+            self.video_recorder.capture(batched_obs_seq)
+            self.video_recorder.save(f'{step}.mp4')
+
+        return eval_episode_rewards
+
+
+
     def run(self):
         timesteps_cnt = 0
         updates_cnt = 0
         episodes_cnt = 0
-        episode_rewards = deque(maxlen=30)
+        episode_rewards = deque(maxlen=50)
         episode_rewards.append(0)
 
         next_obs = self.env.reset()
@@ -96,7 +127,6 @@ class Workspace(object):
                 value, action, action_logp, action_entropy, rnn_h = self.net.act(obs, rnn_h, done)
 
                 next_obs, reward, done, infos = self.env.step(action)
-                # TODO change bad transition extraction
                 timeout = torch.FloatTensor([[1.0] if 'TimeLimit.truncated' in info.keys() else [0.0] for info in infos]).to(self.cfg.device)
 
                 for info in infos:
@@ -128,6 +158,11 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
                 self.logger.dump(updates_cnt)
 
+            if updates_cnt % self.cfg.eval_frequency_step == 0:
+                eval_rewards = self.evaluate(timesteps_cnt)
+                self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
+                self.logger.dump(updates_cnt)
+
             # if torch.stack(self.buffer.done).sum() > 0:
             #     print("now!")
             # if torch.stack(self.buffer.timeout).sum() > 0:
@@ -135,12 +170,16 @@ class Workspace(object):
             self.buffer.after_update()
             rnn_h = rnn_h.detach()
 
+        return np.mean(episode_rewards)
 
-@hydra.main(config_path='configs/', config_name='simple')
+
+@hydra.main(config_path='configs/', config_name='ng_cartpole')
 def main(cfg):
     workspace = Workspace(cfg)
-    print(cfg.pretty())
-    workspace.run()
+    # print(cfg.pretty())
+    mean_reward = workspace.run()
+    return float(mean_reward)
+
 
 
 if __name__ == '__main__':

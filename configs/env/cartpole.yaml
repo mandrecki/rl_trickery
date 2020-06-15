@@ -1,8 +1,7 @@
 # @package _group_
-#env_id: CartPole-v0
-env_id: FrozenLake-v0
+env_id: CartPole-v0
 env_kwargs: {}
-max_timesteps: 100
+max_timesteps: 200
 obs_type: proprioceptive
 image_size: 64
 to_grayscale: false

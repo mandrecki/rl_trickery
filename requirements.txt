@@ -1,9 +1,9 @@
 
 gym
 gym_tetris
-hydra-core
 imageio-ffmpeg
 jupyter
+hydra-nevergrad-sweeper
 tensorflow
 torch
 torchvision

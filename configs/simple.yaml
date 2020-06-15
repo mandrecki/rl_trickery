@@ -19,6 +19,7 @@ defaults:
 #  - env: tetris
 #  - agent: a2c_image
   - agent: a2c_proprio
+  - hydra/sweeper: nevergrad
 
 # hydra configuration
 hydra:

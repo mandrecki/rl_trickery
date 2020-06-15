@@ -1,0 +1,75 @@
+num_timesteps: 5e5
+device: cuda:0
+#device: cpu
+seed: 7
+num_envs: ${agent.num_envs}
+
+log_frequency_step: 50
+log_save_tb: true
+save_video: true
+eval_frequency_step: 1000
+num_eval_episodes: 16
+
+defaults:
+#  - env: atari
+#  - env: mazelab
+  - env: cartpole
+#  - env: lunarlander
+#  - env: pixelcopter
+#  - env: tetris
+#  - agent: a2c_image
+  - agent: a2c_proprio
+  - hydra/sweeper: nevergrad
+
+# hydra configuration
+hydra:
+  run:
+    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+  sweep:
+    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}_${hydra.job.num}
+
+  sweeper:
+    params:
+      optim:
+        optimizer: OnePlusOne
+        # total number of function evaluations to perform
+        budget: 20
+        # number of parallel workers for performing function evaluations
+        num_workers: 1
+        maximize: true  # comment out for maximization
+      # default parametrization of the search space
+      parametrization:
+        # either one or the other
+#        agent.algo_params.use_timeout:
+#          - true
+#          - false
+        agent.algo_params.optimizer_type:
+          - adam
+          - rmsprop
+#          - sgd
+#         a log-distributed positive scalar, evolving by factors of 2 on average
+        agent.algo_params.lr:
+          init: 0.01
+          step: 2.0
+          log: true
+        # a linearly-distributed scalar between 0 and 1
+        agent.algo_params.max_grad_norm:
+          lower: 0.01
+          upper: 10.0
+          log: true
+        agent.num_steps:
+          lower: 4
+          upper: 25
+          integer: true
+          log: true
+        agent.num_envs:
+          lower: 2
+          upper: 32
+          integer: true
+          log: true
+        agent.network_params.hidden_size:
+          lower: 8
+          upper: 128
+          integer: true
+          log: true
