@@ -55,27 +55,22 @@ class Workspace(object):
 
         # init net
         self.net = RecursivePolicy(
-            obs_shape=self.env.observation_space.shape,
+            obs_space=self.env.observation_space,
             action_space=self.env.action_space,
-            **self.cfg.agent.network
+            **self.cfg.agent.network_params
         )
         print("Model params count:", utils.get_n_params(self.net))
         self.net.to(self.device)
 
         # init storage
-        self.buffer = TrickyRollout(self.cfg.agent.gamma)
+        self.buffer = TrickyRollout()
 
         # init agent
         if cfg.agent.name == 'a2c':
             self.agent = A2C(
                 self.net,
                 self.buffer,
-                cfg.agent.value_loss_coef,
-                cfg.agent.entropy_coef,
-                lr=cfg.agent.lr,
-                eps=cfg.agent.eps,
-                alpha=cfg.agent.alpha,
-                max_grad_norm=cfg.agent.max_grad_norm
+                **self.cfg.agent.algo_params,
             )
         else:
             raise NotImplementedError
@@ -91,8 +86,8 @@ class Workspace(object):
         episode_rewards.append(0)
 
         next_obs = self.env.reset()
-        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size())
-        done = torch.zeros((self.env.num_envs, 1))
+        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
+        done = torch.zeros((self.env.num_envs, 1)).to(self.device)
 
         while timesteps_cnt < self.cfg.num_timesteps:
             start_time = time.time()
@@ -103,7 +98,7 @@ class Workspace(object):
                 next_obs, reward, done, infos = self.env.step(action)
                 # TODO change bad transition extraction
                 timeout = torch.FloatTensor([[1.0] if 'TimeLimit.truncated' in info.keys() else [0.0] for info in infos]).to(self.cfg.device)
-                # reward /= 100
+
                 for info in infos:
                     if 'episode' in info.keys():
                         episode_rewards.append(info['episode']['r'])
@@ -115,7 +110,6 @@ class Workspace(object):
             with torch.no_grad():
                 value = self.net.get_value(next_obs, rnn_h, done)
                 self.buffer.v.append(value)
-                self.buffer.compute_returns()
 
             value_loss, action_loss, entropy_loss = self.agent.update()
             updates_cnt += 1
@@ -134,7 +128,12 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
                 self.logger.dump(updates_cnt)
 
+            # if torch.stack(self.buffer.done).sum() > 0:
+            #     print("now!")
+            # if torch.stack(self.buffer.timeout).sum() > 0:
+            #     print("now2!")
             self.buffer.after_update()
+            rnn_h = rnn_h.detach()
 
 
 @hydra.main(config_path='configs/', config_name='simple')

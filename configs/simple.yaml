@@ -4,7 +4,7 @@ device: cuda:0
 seed: 1
 num_envs: ${agent.num_envs}
 
-log_frequency_step: 10
+log_frequency_step: 1
 log_save_tb: true
 save_video: true
 eval_frequency_step: 500
@@ -13,8 +13,9 @@ num_eval_episodes: 8
 defaults:
 #  - env: atari
 #  - env: mazelab
-#  - env: cartpole
-  - env: lunarlander
+  - env: cartpole
+#  - env: lunarlander
+#  - env: pixelcopter
 #  - env: tetris
 #  - agent: a2c_image
   - agent: a2c_proprio

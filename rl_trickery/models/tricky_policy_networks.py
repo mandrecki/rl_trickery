@@ -9,6 +9,17 @@ from a2c_ppo_acktr.utils import init
 from rl_trickery.models.conv_lstm import ConvLSTMCell
 
 
+class Discrete2OneHot(nn.Module):
+    def __init__(self, n):
+        super(Discrete2OneHot, self).__init__()
+        self.n = n
+
+    def forward(self, x):
+        oh = torch.zeros((x.size(0), self.n), device=x.device)
+        oh[range(x.size(0)), x.long()] = 1
+        return oh
+
+
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
@@ -27,8 +38,8 @@ class NoTransition(nn.Module):
     def __init__(self, hidden_size):
         super(NoTransition, self).__init__()
         self.recurrent_hidden_state_size = 0
-        self.in_shape = np.atleast_1d(hidden_size)
-        self.out_shape = np.atleast_1d(hidden_size)
+        self.in_shape = (hidden_size,)
+        self.out_shape = (hidden_size,)
 
     def forward(self, x, rnn_state, done, action_cog=None):
         return x, rnn_state
@@ -37,10 +48,10 @@ class NoTransition(nn.Module):
 class RNNTransition(nn.Module):
     def __init__(self, hidden_size, action_cog=False):
         super(RNNTransition, self).__init__()
-        self.in_shape = np.atleast_1d(hidden_size)
-        self.out_shape = np.atleast_1d(hidden_size)
-        self.in_shape += int(action_cog)
-        self.recurrent_hidden_state_size = hidden_size
+        self.in_shape = (hidden_size,)
+        self.out_shape = (hidden_size,)
+        # self.in_shape += int(action_cog)
+        self.recurrent_hidden_state_size = (hidden_size,)
         self.gru = nn.GRUCell(hidden_size, hidden_size, bias=True)
         for name, param in self.gru.named_parameters():
             if 'bias' in name:
@@ -59,8 +70,8 @@ class RNNTransition(nn.Module):
 class CRNNTransition(nn.Module):
     def __init__(self, state_channels, action_cog=False):
         super(CRNNTransition, self).__init__()
-        self.in_shape = np.atleast_1d(state_channels, 7, 7)
-        self.out_shape = np.atleast_1d(state_channels, 7, 7)
+        self.in_shape = (state_channels, 7, 7)
+        self.out_shape = (state_channels, 7, 7)
         self.state_channels = state_channels
         self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
         self.conv_lstm = ConvLSTMCell(
@@ -118,21 +129,30 @@ class DimensionalityAdjuster(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, obs_shape, hidden_size=512, state_channels=32):
+    def __init__(self, obs_space, hidden_size=512, state_channels=32):
         super(Encoder, self).__init__()
+        if obs_space.__class__.__name__ == "Discrete":
+            self.out_shape = np.atleast_1d(hidden_size)
+            self.in_shape = (obs_space.n,)
+            init_linear = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
+                                   constant_(x, 0), np.sqrt(2))
+            self.net = nn.Sequential(
+                Discrete2OneHot(obs_space.n),
+                init_linear(nn.Linear(self.in_shape[0], hidden_size)), nn.Tanh(),
+                init_linear(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
 
-        self.in_shape = obs_shape
-        self.out_shape = None
-        if len(obs_shape) == 1:
+        elif len(obs_space.shape) == 1:
+            self.in_shape = obs_space.shape
             self.out_shape = np.atleast_1d(hidden_size)
             init_linear = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
                                    constant_(x, 0), np.sqrt(2))
             self.net = nn.Sequential(
-                init_linear(nn.Linear(obs_shape[0], hidden_size)), nn.Tanh(),
+                init_linear(nn.Linear(obs_space.shape[0], hidden_size)), nn.Tanh(),
                 init_linear(nn.Linear(hidden_size, hidden_size)), nn.Tanh())
-        elif len(obs_shape) == 3:
-            n_channels = obs_shape[0]
-            im_size = obs_shape[1]
+        elif len(obs_space.shape) == 3:
+            self.in_shape = obs_space.shape
+            n_channels = obs_space.shape[0]
+            im_size = obs_space.shape[1]
             self.out_shape = np.array([state_channels, 7, 7])
             init_relu = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
                                        nn.init.calculate_gain('relu'))
@@ -195,7 +215,7 @@ class ActorCritic(nn.Module):
 class RecursivePolicy(nn.Module):
     def __init__(
             self,
-            obs_shape, action_space,
+            obs_space, action_space,
             architecture,
             state_channels, hidden_size,
             action_cog=False,
@@ -207,7 +227,7 @@ class RecursivePolicy(nn.Module):
         self.architecture = architecture
         self.is_recurrent = architecture in ["rnn", "crnn"]
 
-        self.encoder = Encoder(obs_shape, hidden_size, state_channels)
+        self.encoder = Encoder(obs_space, hidden_size, state_channels)
 
         if architecture == "ff":
             self.transition = NoTransition(hidden_size)

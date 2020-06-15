@@ -1,15 +1,16 @@
 # @package _group_
-#env_id: CartPole-v0
-env_id: FrozenLake-v0
-env_kwargs: {}
-max_timesteps: 100
-obs_type: proprioceptive
+env_id: PixelCopter-v0
+env_kwargs:
+  width: 64
+  height: 64
+#max_timesteps: 1000
+obs_type: image
 image_size: 64
 to_grayscale: false
 episode_life: false
 clip_rewards: false
 mind_pause: false
-frame_stack: 1
+frame_stack: 4
 frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true

@@ -55,7 +55,6 @@ def make_env(
         obs_type="image",
         image_size=84,
         frame_skip=1,
-        augment=False,
         mind_pause=False,
         random_initial_steps=0,
         max_timesteps=None,
