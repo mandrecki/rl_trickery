@@ -1,0 +1,16 @@
+# @package _group_
+env_id: LunarLander-v2
+env_kwargs: {}
+max_timesteps: 1000
+obs_type: proprioceptive
+image_size: 64
+to_grayscale: false
+episode_life: false
+clip_rewards: false
+augment: false
+mind_pause: true
+frame_stack: 1
+frame_skip: 1
+random_initial_steps: 0
+pytorch_dim_order: true
+device: ${device}

@@ -14,9 +14,7 @@ from baselines import bench
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
 
-from .wrappers import ToImageObservation, CropImage, ResizeImage, RandomPadCropImage,\
-    ScaleImage, StepSkipEnv, PauseWrapper, RandomResetSteps, TransposeImage, VecPyTorch, \
-    VecPyTorchFrameStack, wrap_deepmind_modified
+from .wrappers import *
 
 
 
@@ -50,12 +48,16 @@ def make_env(
         env_kwargs={},
         seed=0,
         pytorch_dim_order=True,
+        obs_type="image",
         image_size=84,
         frame_skip=1,
         augment=False,
         mind_pause=False,
         random_initial_steps=0,
         max_timesteps=None,
+        episode_life=False,
+        to_grayscale=False,
+        clip_rewards=False,
         **kwargs
 ):
     env = gym.make(env_id, **env_kwargs)
@@ -81,8 +83,6 @@ def make_env(
         env = JoypadSpace(env, SIMPLE_MOVEMENT)
 
     env.seed(seed)
-    # if max_timesteps:
-    #     env = TimeLimit(env, max_episode_steps=max_timesteps)
     if random_initial_steps > 0:
         env = RandomResetSteps(env, random_initial_steps)
     if frame_skip > 1:
@@ -90,31 +90,35 @@ def make_env(
     if max_timesteps:
         env = TimeLimit(env, max_episode_steps=max_timesteps)
     env = bench.Monitor(env, filename=None, allow_early_resets=True)
-    env = wrap_deepmind_modified(env, **kwargs)
 
-    # standard pytorch-a2c way
-    # env = make_atari(env_id)
-    # env = bench.Monitor(env, filename=None, allow_early_resets=True)
-    # env = wrap_deepmind(env)
+    if episode_life:
+        env = EpisodicLifeEnv(env)
+    if clip_rewards:
+        env = ClipRewardEnv(env)
 
-    # Crop and resize if necessary
-    if env_id in CROP_ENVS.keys():
-        env = CropImage(env, CROP_ENVS.get(env_id))
-
-    target_size = (image_size, image_size)
-    if env_id in UPSCALE_ENVS:
-        env = ResizeImage(env, target_size, antialias=True)
-    elif env.observation_space.shape[0:2] != target_size:
-        env = ResizeImage(env, target_size, antialias=False)
-
-    if augment:
-        env = RandomPadCropImage(env)
+    # if image env
+    obs_type
+    if obs_type == "image":
+        assert len(env.observation_space.shape) == 3
+        if to_grayscale:
+            env = ToGrayscale(env)
+        # Crop and resize if necessary
+        if env_id in CROP_ENVS.keys():
+            env = CropImage(env, CROP_ENVS.get(env_id))
+        target_size = (image_size, image_size)
+        if env_id in UPSCALE_ENVS:
+            env = ResizeImage(env, target_size, antialias=True)
+        elif env.observation_space.shape[0:2] != target_size:
+            env = ResizeImage(env, target_size, antialias=False)
+        if pytorch_dim_order:
+            env = TransposeImage(env)
+    elif obs_type == "proprioceptive":
+        pass
+    else:
+        raise NotImplementedError
 
     if mind_pause:
         env = PauseWrapper(env)
-
-    if pytorch_dim_order:
-        env = TransposeImage(env)
 
     return env
 

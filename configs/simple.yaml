@@ -1,0 +1,26 @@
+num_timesteps: 1e5
+#device: cuda:0
+device: cpu
+seed: 0
+num_envs: ${agent.num_envs}
+
+log_frequency_step: 1
+log_save_tb: true
+save_video: true
+eval_frequency_step: 5e4
+num_eval_episodes: 8
+
+defaults:
+#  - env: atari
+#  - env: mazelab
+  - env: lunarlander
+#  - env: tetris
+  - agent: a2c
+
+# hydra configuration
+hydra:
+  run:
+    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+  sweep:
+    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}_${hydra.job.num}

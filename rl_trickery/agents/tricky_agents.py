@@ -94,11 +94,9 @@ class A2C(object):
             cognition_cost=0.1,
             cognitive_coef=0.5,
             only_action_values=True,
-            device="c"
     ):
         self.net = net
         self.buf = buffer
-        self.device = self.net.device()
 
         self.cognitive_coef = cognitive_coef
         self.long_horizon = long_horizon
