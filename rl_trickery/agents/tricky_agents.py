@@ -61,11 +61,15 @@ class TrickyRollout(object):
 
     def after_update(self):
         for i in range(len(self.buffers)):
-            self.buffers[i] = self.buffers[i][-1:]
+            last = self.buffers[i][-1].detach()
+            self.buffers[i].clear()
+            self.buffers[i].append(last)
 
         if not self.a_c:
             for i in range(len(self.buffers_cog)):
-                self.buffers_cog[i] = self.buffers_cog[i][-1:]
+                last = self.buffers[i][-1].detach()
+                self.buffers[i].clear()
+                self.buffers[i].append(last)
 
     def compute_returns(self):
         # usual returns

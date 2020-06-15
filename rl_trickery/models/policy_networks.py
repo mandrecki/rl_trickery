@@ -526,8 +526,10 @@ class PolicyNetwork2AM(RecurrentPolicy):
         dist_entropy = dist.entropy().mean()
 
         # compute cog variables
-        value_cog = self.critic_cog(x)
-        dist_cog = self.actor_cog(x)
+        value_cog = self.critic_cog(x.detach())
+        dist_cog = self.actor_cog(x.detach())
+        # value_cog = self.critic_cog(x)
+        # dist_cog = self.actor_cog(x)
 
         action_cog_log_probs = dist_cog.log_probs(action_cog)
         dist_entropy_cog = dist_cog.entropy().mean()

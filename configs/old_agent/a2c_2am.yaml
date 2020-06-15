@@ -1,5 +1,5 @@
 agent:
-  name: a2c
+  name: a2c_2am
   num_envs: 16
   network:
     architecture: "crnn"
@@ -19,4 +19,8 @@ agent:
   device: ${device}
   use_gae: false
   gae_lambda: 0.95
-  use_proper_time_limits: False
+  use_proper_time_limits: true
+  long_horizon: true
+  cognition_cost: 0.01
+  cognitive_coef: 0.0
+  only_action_values: false

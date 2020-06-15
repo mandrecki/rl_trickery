@@ -15,7 +15,7 @@ defaults:
 #  - env: mazelab
   - env: lunarlander
 #  - env: tetris
-  - agent: a2c
+  - agent: a2c_new
 
 # hydra configuration
 hydra:

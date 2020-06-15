@@ -120,9 +120,9 @@ class Workspace(object):
 
             if updates_cnt % self.cfg.log_frequency_step == 0:
                 end_time = time.time()
-                timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.num_train_steps
+                timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), updates_cnt)
-                self.logger.log('train/value', self.buffer.value_preds.mean(), updates_cnt)
+                # self.logger.log('train/value', self.buffer.v.mean(), updates_cnt)
                 self.logger.log('train/episode', episodes_cnt, updates_cnt)
                 self.logger.log('train/timestep', timesteps_cnt, updates_cnt)
                 self.logger.log('train/duration', end_time - start_time, updates_cnt)
@@ -135,7 +135,7 @@ class Workspace(object):
             self.buffer.after_update()
 
 
-@hydra.main(config_path='configs/simple.yaml')
+@hydra.main(config_path='configs/', config_name='simple')
 def main(cfg):
     workspace = Workspace(cfg)
     print(cfg.pretty())

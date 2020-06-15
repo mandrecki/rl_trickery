@@ -186,8 +186,7 @@ class Workspace(object):
 
     def run(self):
         episode_rewards = deque(maxlen=30)
-        episode_rewards.append(0)
-        episode_rewards.append(0)
+        episode_rewards.append(-4)
         timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.num_envs * self.cfg.env.frame_skip)
         num_updates = int(self.cfg.num_train_steps // timesteps_per_update)
         total_episodes = 0
@@ -210,9 +209,11 @@ class Workspace(object):
                 if self.cfg.agent.name == "a2c_2am":
                     value, value_cog = value
                     action, action_cog = action
-                    if step == 0:
+                    n = self.cfg.agent.num_steps
+                    if (step + 1) % n == 0:
                         action_cog.fill_(1)
-                    # action_cog.fill_(1)
+                    else:
+                        action_cog.fill_(1)
                     action_log_prob, action_cog_log_prob = action_log_prob
                     pausable_action = action.clone()
                     pausable_action[action_cog == 0] = 127
@@ -232,9 +233,12 @@ class Workspace(object):
                 total_episodes += sum(done)
 
                 bad_masks = torch.FloatTensor(
-                    [[0.0] if 'bad_transition' in info.keys() else [1.0]
+                    [[0.0] if 'TimeLimit.truncated' in info.keys() else [1.0]
                      for info in infos]
                 )
+                # for info in infos:
+                #     if info:
+                #         print(info)
 
                 if self.cfg.agent.name == "a2c_2am":
                     self.rollouts.insert(

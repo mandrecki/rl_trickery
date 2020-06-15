@@ -85,7 +85,7 @@ class A2C_2AM():
         value_cog_loss = advantages_cog.pow(2).mean()
 
         action_cog_loss = -(advantages_cog[1:].detach() * action_cog_log_probs[1:-1]).mean()
-        cog_loss = (value_cog_loss * 0.01 + action_cog_loss -
+        cog_loss = (value_cog_loss + action_cog_loss -
                     dist_entropy_cog * self.entropy_coef)
 
         self.optimizer.zero_grad()
@@ -120,9 +120,9 @@ class A2C_2AM():
 
                 # if no env action taken (a_c = 0)
                 if self.long_horizon:
-                    returns[step] = masks[step] * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
+                    returns[step] = masks[step+1] * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
                 else:
-                    returns[step] = masks[step] * (1 - a_cog[step]) * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
+                    returns[step] = masks[step+1] * (1 - a_cog[step]) * self.gamma_cog * next_value + value_accuracy * (1 - a_cog[step])
                 next_value = returns[step]
 
         return returns

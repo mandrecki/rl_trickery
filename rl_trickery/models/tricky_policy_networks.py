@@ -137,13 +137,13 @@ class Encoder(nn.Module):
             init_relu = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0),
                                        nn.init.calculate_gain('relu'))
             if im_size == 84:
-                self.encoder = nn.Sequential(
+                self.net = nn.Sequential(
                     init_relu(nn.Conv2d(n_channels, 32, 8, stride=4)), nn.ReLU(),
                     init_relu(nn.Conv2d(32, 64, 4, stride=2)), nn.ReLU(),
                     init_relu(nn.Conv2d(64, state_channels, 3, stride=1)), nn.ReLU(),
                 )
             elif im_size == 64:
-                self.encoder = nn.Sequential(
+                self.net = nn.Sequential(
                     # input (x, 64, 64)
                     init_relu(nn.Conv2d(n_channels, 32, 6, stride=4, padding=1)), nn.ReLU(),
                     # input (3, 16, 16)
@@ -156,7 +156,7 @@ class Encoder(nn.Module):
                 raise NotImplementedError
 
     def forward(self, x):
-        y = self.encoder(x)
+        y = self.net(x)
         return y
 
 
@@ -199,7 +199,6 @@ class RecursivePolicy(nn.Module):
             **kwargs):
         super(RecursivePolicy, self).__init__()
 
-        assert obs_shape[1] == obs_shape[2]
         self.spatial_latent_size = (7, 7)
         self.hidden_size = hidden_size
         self.architecture = architecture
