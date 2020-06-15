@@ -1,5 +1,5 @@
 # @package _group_
-env_id: LunarLander-v2
+env_id: CartPole-v0
 env_kwargs: {}
 max_timesteps: 1000
 obs_type: proprioceptive
@@ -7,7 +7,7 @@ image_size: 64
 to_grayscale: false
 episode_life: false
 clip_rewards: false
-mind_pause: true
+mind_pause: false
 frame_stack: 1
 frame_skip: 1
 random_initial_steps: 0

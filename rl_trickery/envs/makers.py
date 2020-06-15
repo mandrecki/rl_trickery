@@ -65,7 +65,7 @@ def make_env(
         **kwargs
 ):
     env = gym.make(env_id, **env_kwargs)
-    if env_id in GYM_ENVS:
+    if env_id in GYM_ENVS and obs_type == "image":
         env = ToImageObservation(env)
     elif env_id in DMC2_ENVS:
         import dmc2gym
@@ -101,7 +101,6 @@ def make_env(
         env = ClipRewardEnv(env)
 
     # if image env
-    obs_type
     if obs_type == "image":
         assert len(env.observation_space.shape) == 3
         if to_grayscale:

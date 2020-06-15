@@ -1,11 +1,11 @@
 # @package _group_
 name: a2c
-num_envs: 16
+num_envs: 8
 network:
   architecture: "ff"
   state_channels: 32
-  hidden_size: 512
-lr: 7e-4
+  hidden_size: 256
+lr: 1e-3
 gamma: 0.99
 value_loss_coef: 0.5
 entropy_coef: 0.01

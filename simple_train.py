@@ -59,6 +59,7 @@ class Workspace(object):
             action_space=self.env.action_space,
             **self.cfg.agent.network
         )
+        print("Model params count:", utils.get_n_params(self.net))
         self.net.to(self.device)
 
         # init storage
@@ -101,7 +102,8 @@ class Workspace(object):
 
                 next_obs, reward, done, infos = self.env.step(action)
                 # TODO change bad transition extraction
-                timeout = torch.FloatTensor([[1.0] if 'bad_transition' in info.keys() else [0.0] for info in infos])
+                timeout = torch.FloatTensor([[1.0] if 'TimeLimit.truncated' in info.keys() else [0.0] for info in infos]).to(self.cfg.device)
+                # reward /= 100
                 for info in infos:
                     if 'episode' in info.keys():
                         episode_rewards.append(info['episode']['r'])
@@ -122,7 +124,7 @@ class Workspace(object):
                 end_time = time.time()
                 timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), updates_cnt)
-                # self.logger.log('train/value', self.buffer.v.mean(), updates_cnt)
+                self.logger.log('train/value', torch.stack(self.buffer.v).mean(), updates_cnt)
                 self.logger.log('train/episode', episodes_cnt, updates_cnt)
                 self.logger.log('train/timestep', timesteps_cnt, updates_cnt)
                 self.logger.log('train/duration', end_time - start_time, updates_cnt)

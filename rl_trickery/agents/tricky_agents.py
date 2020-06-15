@@ -61,15 +61,16 @@ class TrickyRollout(object):
 
     def after_update(self):
         for i in range(len(self.buffers)):
-            last = self.buffers[i][-1].detach()
+            # last = self.buffers[i][-1].detach()
             self.buffers[i].clear()
-            self.buffers[i].append(last)
+            # self.buffers[i].append(last)
+        self.v_target = []
 
         if not self.a_c:
             for i in range(len(self.buffers_cog)):
-                last = self.buffers[i][-1].detach()
+                # last = self.buffers[i][-1].detach()
                 self.buffers[i].clear()
-                self.buffers[i].append(last)
+                # self.buffers[i].append(last)
 
     def compute_returns(self):
         # usual returns
@@ -87,7 +88,7 @@ class A2C(object):
     def __init__(
             self,
             net,
-            buffer:TrickyRollout,
+            buffer: TrickyRollout,
             value_loss_coef,
             entropy_coef,
             lr=None,

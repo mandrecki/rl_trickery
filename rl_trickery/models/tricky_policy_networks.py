@@ -93,7 +93,7 @@ class DimensionalityAdjuster(nn.Module):
         elif len(in_shape) < len(out_shape):
             # unflatten
             self.net = nn.Sequential(
-                init_relu(nn.Linear(in_shape, int(np.prod(out_shape[0])))),
+                init_relu(nn.Linear(in_shape[0], int(np.prod(out_shape)))),
                 Unflatten(out_shape),
                 nn.ReLU()
             )
@@ -156,7 +156,10 @@ class Encoder(nn.Module):
                 raise NotImplementedError
 
     def forward(self, x):
-        y = self.net(x)
+        if len(self.in_shape) == 3:
+            y = self.net(x.float() / 255.0)
+        else:
+            y = self.net(x.float())
         return y
 
 
@@ -245,7 +248,7 @@ class RecursivePolicy(nn.Module):
             return (0,)
 
     def act(self, obs, rnn_h, done, deterministic=False):
-        x = self.encoder(obs / 255.0)
+        x = self.encoder(obs.float())
         x = self.enc2trans(x)
         x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)
@@ -263,7 +266,7 @@ class RecursivePolicy(nn.Module):
         return value, action, action_log_probs, dist_entropy, rnn_h
 
     def get_value(self, obs, rnn_h, done):
-        x = self.encoder(obs / 255.0)
+        x = self.encoder(obs.float())
         x = self.enc2trans(x)
         x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)

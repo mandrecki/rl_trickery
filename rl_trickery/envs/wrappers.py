@@ -210,8 +210,8 @@ class VecPyTorch(VecEnvWrapper):
     def step_wait(self):
         obs, reward, done, info = self.venv.step_wait()
         obs = torch.from_numpy(obs).to(self.device)
-        reward = torch.from_numpy(reward).unsqueeze(dim=1).float()
-        done = torch.from_numpy(done).unsqueeze(dim=1).float()
+        reward = torch.from_numpy(reward).unsqueeze(dim=1).float().to(self.device)
+        done = torch.from_numpy(done).unsqueeze(dim=1).float().to(self.device)
         return obs, reward, done, info
 
 
