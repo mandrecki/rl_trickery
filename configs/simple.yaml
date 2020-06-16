@@ -1,26 +1,25 @@
-num_timesteps: 1e6
+num_timesteps: 2e6
 device: cuda:0
-#device: cpu
-seed: 4
+seed: 0
 num_envs: ${agent.num_envs}
 model_params_count: ???
 
 log_timestep_interval: 1e4
 log_save_tb: true
 save_video: true
-eval_timestep_interval: 2e5
+eval_timestep_interval: 1e5
 num_eval_episodes: 16
 
 defaults:
 #  - env: atari
-#  - env: mazelab
-  - env: cartpole
+  - env: mazelab
+#  - env: cartpole
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris
-#  - agent: a2c_image
-  - agent: a2c_proprio
-  - hydra/sweeper: nevergrad
+  - agent: a2c_image
+#  - agent: a2c_proprio
+#  - hydra/sweeper: nevergrad
 
 
 # hydra configuration
@@ -30,12 +29,12 @@ hydra:
   sweep:
     dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
-  sweeper:
-    params:
-      optim:
-        optimizer: OnePlusOne
-        # total number of function evaluations to perform
-        budget: 20
-        # number of parallel workers for performing function evaluations
-        num_workers: 1
-        maximize: true
+#  sweeper:
+#    params:
+#      optim:
+#        optimizer: OnePlusOne
+#        # total number of function evaluations to perform
+#        budget: 20
+#        # number of parallel workers for performing function evaluations
+#        num_workers: 1
+#        maximize: true

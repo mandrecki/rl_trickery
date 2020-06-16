@@ -34,7 +34,9 @@ class Workspace(object):
                              log_frequency=cfg.log_timestep_interval,
                              agent=cfg.agent.name)
 
-        utils.set_seed_everywhere(cfg.seed)
+        if self.cfg.seed == 0:
+            self.cfg.seed = int(time.time_ns() / 10e9)
+        utils.set_seed_everywhere(self.cfg.seed)
 
         if torch.cuda.is_available():
             self.device = torch.device(self.cfg.device)
@@ -129,7 +131,14 @@ class Workspace(object):
 
         while timesteps_cnt < self.cfg.num_timesteps:
             start_time = time.time()
-            for t in range(self.cfg.agent.num_steps):
+            steps_since_update = 0
+            safety_cnt = 0
+
+            # for t in range(self.cfg.agent.num_steps):  # old loop management
+            while steps_since_update < self.cfg.agent.num_steps * self.env.num_envs:
+                safety_cnt += 1
+                if safety_cnt > 100 * self.env.num_envs:
+                    break
                 obs = next_obs
                 env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done)
                 value, action, action_logp, action_entropy = env_policy
@@ -145,10 +154,11 @@ class Workspace(object):
                         episode_rewards.append(info['episode']['r'])
 
                 episodes_cnt += done.sum()
-                timesteps_cnt += cog_policy.action.sum() * self.cfg.env.frame_skip
+                steps_since_update += cog_policy.action.sum()
                 self.buffer.append(obs, action, reward, done, timeout, rnn_h, value, action_logp, action_entropy)
                 self.buffer.append_cog(*cog_policy)
 
+            timesteps_cnt += steps_since_update * self.cfg.env.frame_skip
             with torch.no_grad():
                 env_policy, cog_policy, _ = self.net(next_obs, rnn_h, done)
                 self.buffer.v.append(env_policy.value)
@@ -171,7 +181,7 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
                 self.logger.dump(updates_cnt)
 
-            if (updates_cnt) % (1+self.cfg.eval_timestep_interval+1//timesteps_per_update) == 0:
+            if (updates_cnt) % (1+self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
                 with torch.no_grad():
                     eval_rewards = self.evaluate(timesteps_cnt)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)

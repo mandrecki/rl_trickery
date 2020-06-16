@@ -7,6 +7,7 @@ network_params:
   architecture: "crnn"
   state_channels: 32
   hidden_size: 256
+  random_cog_fraction: 0.5
 algo_params:
   lr: 7e-4
   gamma: 0.99
@@ -18,5 +19,5 @@ algo_params:
   use_timeout: true
   smooth_value_loss: true
   reward_rescale: false
-#  optimizer_type: adam
+  update_cognitive_values: true
   optimizer_type: rmsprop

@@ -186,6 +186,7 @@ class A2C(object):
             optimizer_type="RMSprop",
             smooth_value_loss=False,
             reward_rescale=False,
+            update_cognitive_values=False,
     ):
         self.net = net
         self.buf = buffer
@@ -193,6 +194,8 @@ class A2C(object):
         self.gamma = gamma
         self.use_timeout = use_timeout
         self.cognitive_coef = cognitive_coef
+        self.update_cognitive_values = update_cognitive_values
+
         self.long_horizon = long_horizon
         self.cognition_cost = cognition_cost
         self.only_action_values = only_action_values
@@ -259,7 +262,11 @@ class A2C(object):
             adv = F.smooth_l1_loss(v, v_target.detach(), reduction="none")
         else:
             adv = F.mse_loss(v, v_target.detach(), reduction="none")
-        v_loss = adv[a_c == 1].mean()
+
+        if self.update_cognitive_values:
+            v_loss = adv.mean()
+        else:
+            v_loss = adv[a_c == 1].mean()
 
         full_adv = (v_target - v)
         a_loss = -(full_adv[a_c == 1].detach() * a_logp[a_c == 1]).mean()
