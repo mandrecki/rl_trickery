@@ -55,7 +55,7 @@ def make_env(
         obs_type="image",
         image_size=84,
         frame_skip=1,
-        mind_pause=False,
+        cognitive_pause=False,
         random_initial_steps=0,
         max_timesteps=None,
         episode_life=False,
@@ -119,8 +119,8 @@ def make_env(
     else:
         raise NotImplementedError
 
-    if mind_pause:
-        env = PauseWrapper(env)
+    if cognitive_pause:
+        env = PauseWrapper(env, cognitive_pause)
 
     return env
 

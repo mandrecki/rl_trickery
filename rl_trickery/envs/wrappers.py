@@ -165,7 +165,7 @@ class RandomResetSteps(gym.Wrapper):
 
 
 class PauseWrapper(gym.Wrapper):
-    def __init__(self, env, special_value=127):
+    def __init__(self, env, special_value=1337):
         super(PauseWrapper, self).__init__(env)
         self.obs = None
         self.rew = 0

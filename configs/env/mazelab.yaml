@@ -13,7 +13,7 @@ image_size: 64
 to_grayscale: false
 episode_life: false
 clip_rewards: false
-mind_pause: false
+cognitive_pause: 1337
 frame_stack: 1
 frame_skip: 1
 random_initial_steps: 0

@@ -7,6 +7,8 @@ from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian
 from a2c_ppo_acktr.utils import init
 
 from rl_trickery.models.conv_lstm import ConvLSTMCell
+import collections
+import gym
 
 
 class Discrete2OneHot(nn.Module):
@@ -213,6 +215,9 @@ class ActorCritic(nn.Module):
         return x
 
 
+
+PolicyOutput = collections.namedtuple('PolicyOutput', 'value, action, action_log_probs, dist_entropy')
+
 class RecursivePolicy(nn.Module):
     def __init__(
             self,
@@ -223,10 +228,12 @@ class RecursivePolicy(nn.Module):
             **kwargs):
         super(RecursivePolicy, self).__init__()
 
-        self.spatial_latent_size = (7, 7)
+        self.twoAM = action_cog
         self.hidden_size = hidden_size
         self.architecture = architecture
         self.is_recurrent = architecture in ["rnn", "crnn"]
+
+
 
         self.encoder = Encoder(obs_space, hidden_size, state_channels)
 
@@ -245,7 +252,7 @@ class RecursivePolicy(nn.Module):
         else:
             raise NotImplementedError
 
-        self.ac_linear = ActorCritic(
+        self.ac_env = ActorCritic(
             action_space=action_space,
             hidden_size=hidden_size
         )
@@ -257,8 +264,18 @@ class RecursivePolicy(nn.Module):
 
         self.trans2ac = DimensionalityAdjuster(
             in_shape=self.transition.out_shape,
-            out_shape=self.ac_linear.in_shape
+            out_shape=self.ac_env.in_shape
         )
+
+        if self.twoAM:
+            self.ac_cog = ActorCritic(
+                action_space=gym.spaces.Discrete(2),
+                hidden_size=hidden_size
+            )
+            self.trans2ac_cog = DimensionalityAdjuster(
+                in_shape=self.transition.out_shape,
+                out_shape=self.ac_cog.in_shape
+            )
 
         self.train()
 
@@ -268,41 +285,53 @@ class RecursivePolicy(nn.Module):
         else:
             return (0,)
 
-    def act(self, obs, rnn_h, done, deterministic=False):
+    def forward(self, obs, rnn_h, done):
         x = self.encoder(obs.float())
         x = self.enc2trans(x)
         x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)
-        value = self.ac_linear.forward_critic(x)
-        dist = self.ac_linear.forward_actor(x)
-
-        if deterministic:
-            action = dist.mode()
-        else:
-            action = dist.sample()
+        value = self.ac_env.forward_critic(x)
+        dist = self.ac_env.forward_actor(x)
+        action = dist.sample()
 
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
 
-        return value, action, action_log_probs, dist_entropy, rnn_h
+        env_policy = PolicyOutput(
+            value=value,
+            action=action,
+            action_log_probs=action_log_probs,
+            dist_entropy=dist_entropy
+        )
+
+        if not self.twoAM:
+            cog_policy = PolicyOutput(
+                value=None,
+                action=torch.ones((action.size(0), 1), device=action.device).long(),
+                action_log_probs=None,
+                dist_entropy=None
+            )
+        else:
+            value_cog = self.ac_cog.forward_critic(x)
+            dist_cog = self.ac_cog.forward_actor(x)
+            action_cog = dist.sample()
+
+            action_cog_log_probs = dist_cog.log_probs(action)
+            dist_cog_entropy = dist_cog.entropy().mean()
+
+            cog_policy = PolicyOutput(
+                value=value_cog,
+                action=action_cog,
+                action_log_probs=action_cog_log_probs,
+                dist_entropy=dist_cog_entropy
+            )
+
+        return env_policy, cog_policy, rnn_h
 
     def get_value(self, obs, rnn_h, done):
         x = self.encoder(obs.float())
         x = self.enc2trans(x)
         x, rnn_h = self.transition(x, rnn_h, done)
         x = self.trans2ac(x)
-        value = self.ac_linear.forward_critic(x)
+        value = self.ac_env.forward_critic(x)
         return value
-
-    # def evaluate_actions(self, inputs, rnn_hxs, masks, action):
-    #     x = self.encoder(inputs / 255.0)
-    #     x = self.enc2trans(x)
-    #     x, rnn_hxs = self.transition(x, rnn_hxs, masks)
-    #     x = self.trans2ac(x)
-    #     value = self.ac_linear.forward_critic(x)
-    #     dist = self.ac_linear.forward_actor(x)
-    #
-    #     action_log_probs = dist.log_probs(action)
-    #     dist_entropy = dist.entropy().mean()
-    #
-    #     return value, action_log_probs, dist_entropy, rnn_hxs

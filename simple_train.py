@@ -35,7 +35,12 @@ class Workspace(object):
                              agent=cfg.agent.name)
 
         utils.set_seed_everywhere(cfg.seed)
-        self.device = torch.device(cfg.device)
+
+        if torch.cuda.is_available():
+            self.device = torch.device(self.cfg.device)
+        else:
+            self.device = "cpu"
+            self.cfg.device = self.device
 
         # init envs
         self.env = make_envs(
@@ -123,7 +128,11 @@ class Workspace(object):
             start_time = time.time()
             for t in range(self.cfg.agent.num_steps):
                 obs = next_obs
-                value, action, action_logp, action_entropy, rnn_h = self.net.act(obs, rnn_h, done)
+                env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done)
+                value, action, action_logp, action_entropy = env_policy
+
+                pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
+                action = action * cog_policy.action + pause_action * (1 - cog_policy.action)
 
                 next_obs, reward, done, infos = self.env.step(action)
                 timeout = torch.FloatTensor([[1.0] if 'TimeLimit.truncated' in info.keys() else [0.0] for info in infos]).to(self.cfg.device)
@@ -137,8 +146,9 @@ class Workspace(object):
                 self.buffer.append(obs, action, reward, done, timeout, rnn_h, value, action_logp, action_entropy)
 
             with torch.no_grad():
-                value = self.net.get_value(next_obs, rnn_h, done)
-                self.buffer.v.append(value)
+                env_policy, cog_policy, _ = self.net(next_obs, rnn_h, done)
+                self.buffer.v.append(env_policy.value)
+                self.buffer.v_c.append(cog_policy.value)
 
             value_loss, action_loss, entropy_loss = self.agent.update()
             updates_cnt += 1
@@ -162,10 +172,6 @@ class Workspace(object):
                 self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)
                 self.logger.dump(updates_cnt)
 
-            # if torch.stack(self.buffer.done).sum() > 0:
-            #     print("now!")
-            # if torch.stack(self.buffer.timeout).sum() > 0:
-            #     print("now2!")
             self.buffer.after_update()
             rnn_h = rnn_h.detach()
 
