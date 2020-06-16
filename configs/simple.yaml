@@ -1,14 +1,15 @@
-num_timesteps: 1e6
+num_timesteps: 5e6
 device: cuda:0
 #device: cpu
-seed: 1
+seed: 2
 num_envs: ${agent.num_envs}
+model_params_count: ???
 
-log_frequency_step: 1
+log_frequency_step: 100
 log_save_tb: true
 save_video: true
-eval_frequency_step: 500
-num_eval_episodes: 8
+eval_frequency_step: 5000
+num_eval_episodes: 16
 
 defaults:
 #  - env: atari
@@ -21,10 +22,21 @@ defaults:
   - agent: a2c_proprio
   - hydra/sweeper: nevergrad
 
+
 # hydra configuration
 hydra:
   run:
     dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
   sweep:
     dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.override_dirname}_${hydra.job.num}
+    subdir: ${hydra.job.num}
+
+  sweeper:
+    params:
+      optim:
+        optimizer: OnePlusOne
+        # total number of function evaluations to perform
+        budget: 20
+        # number of parallel workers for performing function evaluations
+        num_workers: 1
+        maximize: true

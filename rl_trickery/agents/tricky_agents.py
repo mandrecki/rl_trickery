@@ -12,11 +12,10 @@ def compute_returns(
     >>> np.array(compute_returns([0.5]*7, [0.1,0.,1.,0.1,0.1,1.], [0.,0.,1.,0.,1.,0.], [0.,0.,0.,0.,1.,0.], 0.9))
     array([0.91, 0.9 , 1.  , 0.55, 0.5 , 1.45])
     """
-
     v = []
     v_discounted = gamma * v_pred[-1]
     for t in reversed(range(len(r))):
-        # timeout than copy over best estimate for this timestep as last value
+        # if timeout then copy over best estimate for this timestep as last value
         # otherwise usual discounting of future values, and setting to zero if done
         if use_timeout:
             v_t = ((1 - done[t]) * v_discounted + r[t]) * (1 - timeout[t]) + v_pred[t] * timeout[t]
@@ -75,16 +74,16 @@ class TrickyRollout(object):
                 # self.buffers[i].append(last)
 
     def compute_returns(self, gamma, use_timeout):
-        # usual returns
-        if not self.a_c:
-            self.v_target = compute_returns(
-                self.v, self.r,
-                self.done, self.timeout,
-                gamma,
-                use_timeout=use_timeout
-            )
-        else:
-            raise NotImplementedError
+        with torch.no_grad():
+            if not self.a_c:
+                self.v_target = compute_returns(
+                    self.v, self.r,
+                    self.done, self.timeout,
+                    gamma,
+                    use_timeout=use_timeout
+                )
+            else:
+                raise NotImplementedError
 
 
 class A2C(object):
@@ -141,7 +140,7 @@ class A2C(object):
         a_logp = torch.stack(self.buf.a_logp)
         ent = torch.stack(self.buf.a_ent)
 
-        adv = v_target - v
+        adv = v_target.detach() - v
         v_loss = adv.pow(2).mean()
         a_loss = -(adv.detach() * a_logp).mean()
         ent_loss = ent.mean()

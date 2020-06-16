@@ -8,13 +8,13 @@ network_params:
   state_channels: 32
   hidden_size: 64
 algo_params:
-  lr: 1e-3
+  lr: 1e-2
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5
   alpha: 0.99
-  max_grad_norm: 0.1
+  max_grad_norm: 0.5
   use_timeout: true
 #  optimizer_type: adam
   optimizer_type: rmsprop

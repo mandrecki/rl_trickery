@@ -1,8 +1,6 @@
 import copy
 import math
 import os
-import pickle as pkl
-import sys
 import time
 
 import numpy as np
@@ -59,7 +57,9 @@ class Workspace(object):
             action_space=self.env.action_space,
             **self.cfg.agent.network_params
         )
-        print("Model params count:", utils.get_n_params(self.net))
+        self.cfg.model_params_count = utils.get_n_params(self.net)
+        print("Model params count:", self.cfg.num_params)
+
         self.net.to(self.device)
 
         # init storage
@@ -106,8 +106,6 @@ class Workspace(object):
             self.video_recorder.save(f'{step}.mp4')
 
         return eval_episode_rewards
-
-
 
     def run(self):
         timesteps_cnt = 0
@@ -161,6 +159,7 @@ class Workspace(object):
             if updates_cnt % self.cfg.eval_frequency_step == 0:
                 eval_rewards = self.evaluate(timesteps_cnt)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
+                self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)
                 self.logger.dump(updates_cnt)
 
             # if torch.stack(self.buffer.done).sum() > 0:
@@ -173,7 +172,7 @@ class Workspace(object):
         return np.mean(episode_rewards)
 
 
-@hydra.main(config_path='configs/', config_name='ng_cartpole')
+@hydra.main(config_path='configs/', config_name='simple')
 def main(cfg):
     workspace = Workspace(cfg)
     # print(cfg.pretty())

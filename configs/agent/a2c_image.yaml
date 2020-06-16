@@ -15,5 +15,6 @@ algo_params:
   eps: 1e-5
   alpha: 0.99
   max_grad_norm: 0.1
+  use_timeout: true
 #  optimizer_type: adam
   optimizer_type: rmsprop
