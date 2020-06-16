@@ -1,25 +1,25 @@
-num_timesteps: 5e6
+num_timesteps: 1e6
 device: cuda:0
 #device: cpu
 seed: 2
 num_envs: ${agent.num_envs}
 model_params_count: ???
 
-log_frequency_step: 100
+log_timestep_interval: 1e4
 log_save_tb: true
 save_video: true
-eval_frequency_step: 5000
+eval_timestep_interval: 2e5
 num_eval_episodes: 16
 
 defaults:
 #  - env: atari
-#  - env: mazelab
+  - env: mazelab
   - env: cartpole
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris
-#  - agent: a2c_image
-  - agent: a2c_proprio
+  - agent: a2c_image
+#  - agent: a2c_proprio
   - hydra/sweeper: nevergrad
 
 

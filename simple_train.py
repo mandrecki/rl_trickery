@@ -31,7 +31,7 @@ class Workspace(object):
         # init loggers
         self.logger = Logger(self.work_dir,
                              save_tb=cfg.log_save_tb,
-                             log_frequency=cfg.log_frequency_step,
+                             log_frequency=cfg.log_timestep_interval,
                              agent=cfg.agent.name)
 
         utils.set_seed_everywhere(cfg.seed)
@@ -58,7 +58,7 @@ class Workspace(object):
             **self.cfg.agent.network_params
         )
         self.cfg.model_params_count = utils.get_n_params(self.net)
-        print("Model params count:", self.cfg.num_params)
+        print("Model params count:", self.cfg.model_params_count)
 
         self.net.to(self.device)
 
@@ -113,6 +113,7 @@ class Workspace(object):
         episodes_cnt = 0
         episode_rewards = deque(maxlen=50)
         episode_rewards.append(0)
+        timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
 
         next_obs = self.env.reset()
         rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
@@ -142,9 +143,8 @@ class Workspace(object):
             value_loss, action_loss, entropy_loss = self.agent.update()
             updates_cnt += 1
 
-            if updates_cnt % self.cfg.log_frequency_step == 0:
+            if (updates_cnt) % (self.cfg.log_timestep_interval//timesteps_per_update) == 0:
                 end_time = time.time()
-                timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), updates_cnt)
                 self.logger.log('train/value', torch.stack(self.buffer.v).mean(), updates_cnt)
                 self.logger.log('train/episode', episodes_cnt, updates_cnt)
@@ -156,7 +156,7 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
                 self.logger.dump(updates_cnt)
 
-            if updates_cnt % self.cfg.eval_frequency_step == 0:
+            if (updates_cnt) % (self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
                 eval_rewards = self.evaluate(timesteps_cnt)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
                 self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)

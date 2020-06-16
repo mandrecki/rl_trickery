@@ -2,7 +2,7 @@
 env_id: Mazelab-v0
 env_kwargs:
   maze_kind: maze
-  maze_size: 11
+  maze_size: 9
   maze_fixed: false
   goal_fixed: false
   goal_reward: false

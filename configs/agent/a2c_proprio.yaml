@@ -1,20 +1,22 @@
 # @package _group_
 name: a2c
 num_envs: 8
-num_steps: 5
+num_steps: 10
 device: ${device}
 network_params:
   architecture: "ff"
   state_channels: 32
   hidden_size: 64
 algo_params:
-  lr: 1e-2
+  lr: 1e-3
   gamma: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5
   alpha: 0.99
-  max_grad_norm: 0.5
+  max_grad_norm: 0.2
   use_timeout: true
+  smooth_value_loss: true
+  reward_rescale: true
 #  optimizer_type: adam
   optimizer_type: rmsprop

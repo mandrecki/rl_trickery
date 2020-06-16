@@ -1,28 +1,50 @@
 import torch
 import numpy as np
 
+from torch.nn import functional as F
+
+
+# from R2D2 repo - reward scaling
+def value_rescale(x, eps=1.0e-3):
+    return x.sign() * ((x.abs() + 1.0).sqrt() - 1.0) + eps * x
+
+
+def inv_value_rescale(x, eps=1.0e-3):
+    if eps == 0:
+        return x.sign() * (x * x + 2.0 * x.abs())
+    else:
+        return x.sign() * ((((1.0 + 4.0 * eps * (x.abs() + 1.0 + eps)).sqrt() - 1.0) / (2.0 * eps)).pow(2) - 1.0)
+
 
 def compute_returns(
         v_pred, r,
         done, timeout,
         gamma,
-        use_timeout=True
+        use_timeout=False,
+        rescale=False,
 ):
     """
     >>> np.array(compute_returns([0.5]*7, [0.1,0.,1.,0.1,0.1,1.], [0.,0.,1.,0.,1.,0.], [0.,0.,0.,0.,1.,0.], 0.9))
     array([0.91, 0.9 , 1.  , 0.55, 0.5 , 1.45])
     """
     v = []
-    v_discounted = gamma * v_pred[-1]
+    v_next = v_pred[-1]
     for t in reversed(range(len(r))):
         # if timeout then copy over best estimate for this timestep as last value
         # otherwise usual discounting of future values, and setting to zero if done
+        if rescale:
+            v_next = inv_value_rescale(v_next)
+
         if use_timeout:
-            v_t = ((1 - done[t]) * v_discounted + r[t]) * (1 - timeout[t]) + v_pred[t] * timeout[t]
+            v_t = ((1 - done[t]) * gamma * v_next + r[t]) * (1 - timeout[t]) + v_pred[t] * timeout[t]
         else:
-            v_t = (1 - done[t]) * v_discounted + r[t]
+            v_t = (1 - done[t]) * gamma * v_next + r[t]
+
+        if rescale:
+            v_t = value_rescale(v_t)
+
         v.append(v_t)
-        v_discounted = gamma * v_t
+        v_next = v_t
     v = list(reversed(v))
 
     return v
@@ -73,14 +95,15 @@ class TrickyRollout(object):
                 self.buffers[i].clear()
                 # self.buffers[i].append(last)
 
-    def compute_returns(self, gamma, use_timeout):
+    def compute_returns(self, gamma, use_timeout, rescale):
         with torch.no_grad():
             if not self.a_c:
                 self.v_target = compute_returns(
                     self.v, self.r,
                     self.done, self.timeout,
-                    gamma,
-                    use_timeout=use_timeout
+                    gamma=gamma,
+                    use_timeout=use_timeout,
+                    rescale=rescale,
                 )
             else:
                 raise NotImplementedError
@@ -104,6 +127,8 @@ class A2C(object):
             cognitive_coef=0.5,
             only_action_values=True,
             optimizer_type="RMSprop",
+            smooth_value_loss=False,
+            reward_rescale=False,
     ):
         self.net = net
         self.buf = buffer
@@ -118,8 +143,10 @@ class A2C(object):
         self.value_loss_coef = value_loss_coef
         self.entropy_coef = entropy_coef
 
+        self.smooth_value_loss = smooth_value_loss
         self.max_grad_norm = max_grad_norm
         self.optimizer_type = optimizer_type.lower()
+        self.reward_rescale = reward_rescale
 
         if self.optimizer_type == "rmsprop":
             self.optimizer = torch.optim.RMSprop(self.net.parameters(), lr, eps=eps, alpha=alpha)
@@ -131,7 +158,7 @@ class A2C(object):
             raise NotImplementedError
 
     def update(self):
-        self.buf.compute_returns(self.gamma, self.use_timeout)
+        self.buf.compute_returns(self.gamma, self.use_timeout, self.reward_rescale)
 
         self.optimizer.zero_grad()
 
@@ -140,9 +167,15 @@ class A2C(object):
         a_logp = torch.stack(self.buf.a_logp)
         ent = torch.stack(self.buf.a_ent)
 
-        adv = v_target.detach() - v
-        v_loss = adv.pow(2).mean()
-        a_loss = -(adv.detach() * a_logp).mean()
+        if self.smooth_value_loss:
+            adv = F.smooth_l1_loss(v, v_target.detach(), reduction="none")
+        else:
+            adv = F.mse_loss(v, v_target.detach(), reduction="none")
+        v_loss = adv.mean()
+
+        full_adv = (v_target - v)
+        a_loss = -(full_adv.detach() * a_logp).mean()
+
         ent_loss = ent.mean()
 
         env_loss = (v_loss * self.value_loss_coef + a_loss - ent_loss * self.entropy_coef)
@@ -152,7 +185,6 @@ class A2C(object):
         self.optimizer.step()
 
         return v_loss, a_loss, ent_loss
-
 
 
 if __name__ == "__main__":
