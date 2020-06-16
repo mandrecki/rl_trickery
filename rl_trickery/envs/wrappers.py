@@ -177,9 +177,9 @@ class PauseWrapper(gym.Wrapper):
     def step(self, action):
         if action != self.special_value:
             self.obs, self.rew, self.done, self.info = self.env.step(action)
-        else:
-            self.rew = 0
-            self.info = {}
+        # else:
+            # self.rew = 0 !!!
+            # self.info = {}
 
         return self.obs, self.rew, self.done, self.info
 

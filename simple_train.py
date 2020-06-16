@@ -96,8 +96,11 @@ class Workspace(object):
             if len(self.env.observation_space.shape) == 3:
                 batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
 
-            with torch.no_grad():
-                _, action, _, _, rnn_h = self.net.act(obs, rnn_h, done)
+            env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done)
+            value, action, _, _ = env_policy
+
+            pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
+            action = action * cog_policy.action + pause_action * (1 - cog_policy.action)
 
             obs, _, done, infos = self.eval_envs.step(action)
 
@@ -142,18 +145,20 @@ class Workspace(object):
                         episode_rewards.append(info['episode']['r'])
 
                 episodes_cnt += done.sum()
-                timesteps_cnt += self.env.num_envs * self.cfg.env.frame_skip
+                timesteps_cnt += cog_policy.action.sum() * self.cfg.env.frame_skip
                 self.buffer.append(obs, action, reward, done, timeout, rnn_h, value, action_logp, action_entropy)
+                self.buffer.append_cog(*cog_policy)
 
             with torch.no_grad():
                 env_policy, cog_policy, _ = self.net(next_obs, rnn_h, done)
                 self.buffer.v.append(env_policy.value)
                 self.buffer.v_c.append(cog_policy.value)
 
-            value_loss, action_loss, entropy_loss = self.agent.update()
+            # value_loss, action_loss, entropy_loss = self.agent.update()  # non-cognitive working update
+            value_loss, action_loss, entropy_loss = self.agent.cognitive_update()
             updates_cnt += 1
 
-            if (updates_cnt) % (self.cfg.log_timestep_interval//timesteps_per_update) == 0:
+            if (updates_cnt) % (1+self.cfg.log_timestep_interval//timesteps_per_update) == 0:
                 end_time = time.time()
                 self.logger.log("train/episode_reward", np.mean(episode_rewards), updates_cnt)
                 self.logger.log('train/value', torch.stack(self.buffer.v).mean(), updates_cnt)
@@ -166,8 +171,9 @@ class Workspace(object):
                 self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
                 self.logger.dump(updates_cnt)
 
-            if (updates_cnt) % (self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
-                eval_rewards = self.evaluate(timesteps_cnt)
+            if (updates_cnt) % (1+self.cfg.eval_timestep_interval+1//timesteps_per_update) == 0:
+                with torch.no_grad():
+                    eval_rewards = self.evaluate(timesteps_cnt)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
                 self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)
                 self.logger.dump(updates_cnt)

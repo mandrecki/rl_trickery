@@ -1,7 +1,7 @@
 num_timesteps: 1e6
 device: cuda:0
 #device: cpu
-seed: 2
+seed: 4
 num_envs: ${agent.num_envs}
 model_params_count: ???
 
@@ -13,13 +13,13 @@ num_eval_episodes: 16
 
 defaults:
 #  - env: atari
-  - env: mazelab
-#  - env: cartpole
+#  - env: mazelab
+  - env: cartpole
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris
-  - agent: a2c_image
-#  - agent: a2c_proprio
+#  - agent: a2c_image
+  - agent: a2c_proprio
   - hydra/sweeper: nevergrad
 
 

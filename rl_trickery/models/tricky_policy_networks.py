@@ -215,8 +215,8 @@ class ActorCritic(nn.Module):
         return x
 
 
-
 PolicyOutput = collections.namedtuple('PolicyOutput', 'value, action, action_log_probs, dist_entropy')
+
 
 class RecursivePolicy(nn.Module):
     def __init__(
@@ -225,15 +225,16 @@ class RecursivePolicy(nn.Module):
             architecture,
             state_channels, hidden_size,
             action_cog=False,
+            random_cog_fraction=0.0,
             **kwargs):
         super(RecursivePolicy, self).__init__()
 
+        assert 0.0 <= random_cog_fraction <= 1.0
         self.twoAM = action_cog
+        self.random_cog_fraction = random_cog_fraction
         self.hidden_size = hidden_size
         self.architecture = architecture
         self.is_recurrent = architecture in ["rnn", "crnn"]
-
-
 
         self.encoder = Encoder(obs_space, hidden_size, state_channels)
 
@@ -295,7 +296,7 @@ class RecursivePolicy(nn.Module):
         action = dist.sample()
 
         action_log_probs = dist.log_probs(action)
-        dist_entropy = dist.entropy().mean()
+        dist_entropy = dist.entropy().unsqueeze(-1)
 
         env_policy = PolicyOutput(
             value=value,
@@ -305,9 +306,14 @@ class RecursivePolicy(nn.Module):
         )
 
         if not self.twoAM:
+            if self.random_cog_fraction:
+                action_cog = torch.rand((action.size(0), 1), device=action.device) > self.random_cog_fraction
+            else:
+                action_cog = torch.ones((action.size(0), 1), device=action.device)
+            action_cog = action_cog.long()
             cog_policy = PolicyOutput(
                 value=None,
-                action=torch.ones((action.size(0), 1), device=action.device).long(),
+                action=action_cog,
                 action_log_probs=None,
                 dist_entropy=None
             )
@@ -317,7 +323,7 @@ class RecursivePolicy(nn.Module):
             action_cog = dist.sample()
 
             action_cog_log_probs = dist_cog.log_probs(action)
-            dist_cog_entropy = dist_cog.entropy().mean()
+            dist_cog_entropy = dist_cog.entropy().unsqueeze(-1)
 
             cog_policy = PolicyOutput(
                 value=value_cog,

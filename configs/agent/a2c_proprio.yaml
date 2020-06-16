@@ -7,6 +7,7 @@ network_params:
   architecture: "ff"
   state_channels: 32
   hidden_size: 64
+  random_cog_fraction: 0.5
 algo_params:
   lr: 1e-3
   gamma: 0.99
