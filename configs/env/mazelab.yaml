@@ -7,7 +7,7 @@ env_kwargs:
   goal_fixed: false
   goal_reward: false
   wall_reward: false
-max_timesteps: 400
+max_timesteps: 300
 obs_type: image
 image_size: 64
 to_grayscale: false
