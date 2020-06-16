@@ -83,6 +83,7 @@ class CRNNTransition(nn.Module):
         hxs = hxs * (1 - done.view(-1, *expansion_dims))
         hxs = hxs.split(self.state_channels, dim=1)
 
+
         h, c = self.conv_lstm(x, hxs)
 
         hxs = torch.cat((h, c), dim=1)

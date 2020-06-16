@@ -14,7 +14,7 @@ num_eval_episodes: 16
 defaults:
 #  - env: atari
   - env: mazelab
-  - env: cartpole
+#  - env: cartpole
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris

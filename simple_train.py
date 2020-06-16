@@ -81,8 +81,8 @@ class Workspace(object):
     def evaluate(self, step):
         eval_episode_rewards = deque()
         obs = self.eval_envs.reset()
-        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
-        done = torch.zeros((self.env.num_envs, 1)).to(self.device)
+        rnn_h = torch.zeros((2,) + self.net.recurrent_hidden_state_size()).to(self.device)
+        done = torch.zeros((2, 1)).to(self.device)
         batched_obs_seq = []
         for i in range(50000):
             if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:

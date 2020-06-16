@@ -4,7 +4,7 @@ num_envs: 16
 num_steps: 10
 device: ${device}
 network_params:
-  architecture: "ff"
+  architecture: "crnn"
   state_channels: 32
   hidden_size: 256
 algo_params:
