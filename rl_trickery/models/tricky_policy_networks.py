@@ -43,19 +43,20 @@ class NoTransition(nn.Module):
         self.in_shape = (hidden_size,)
         self.out_shape = (hidden_size,)
 
-    def forward(self, x, rnn_state, done, action_cog=None):
+    def forward(self, x, rnn_state, done, action_cog):
         return x, rnn_state
 
 
 class RNNTransition(nn.Module):
-    def __init__(self, hidden_size, recurse_depth=1):
+    def __init__(self, hidden_size, recurse_depth=1, append_a_cog=False):
         super(RNNTransition, self).__init__()
+        self.append_a_cog = append_a_cog
         self.recurse_depth = recurse_depth
         self.in_shape = (hidden_size,)
         self.out_shape = (hidden_size,)
         # self.in_shape += int(action_cog)
         self.recurrent_hidden_state_size = (hidden_size,)
-        self.gru = nn.GRUCell(hidden_size, hidden_size, bias=True)
+        self.gru = nn.GRUCell(hidden_size+int(append_a_cog), hidden_size, bias=True)
         for name, param in self.gru.named_parameters():
             if 'bias' in name:
                 nn.init.constant_(param, 0)
@@ -64,7 +65,10 @@ class RNNTransition(nn.Module):
 
         assert recurse_depth >= 1
 
-    def forward(self, x, hxs, done, action_cog=None):
+    def forward(self, x, hxs, done, action_cog):
+        if self.append_a_cog:
+            x = torch.cat((x, action_cog.float()), dim=1)
+
         hxs = hxs * (1 - done.view(-1, 1))
         for i in range(self.recurse_depth):
             hxs = self.gru(x, hxs)
@@ -74,19 +78,25 @@ class RNNTransition(nn.Module):
 
 
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, recurse_depth=1):
+    def __init__(self, state_channels, recurse_depth=1, append_a_cog=False):
         super(CRNNTransition, self).__init__()
+        self.append_a_cog = append_a_cog
         self.recurse_depth = recurse_depth
         self.in_shape = (state_channels, 7, 7)
         self.out_shape = (state_channels, 7, 7)
         self.state_channels = state_channels
         self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
         self.conv_lstm = ConvLSTMCell(
-            input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
+            input_dim=state_channels+int(append_a_cog), hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
         assert recurse_depth >= 1
 
-    def forward(self, x, hxs, done, action_cog=None):
+    def forward(self, x, hxs, done, action_cog):
+        if self.append_a_cog:
+            # cover spatial dimension and cat to channel
+            action_cog = action_cog.float().view((-1, 1, 1, 1)).expand(-1, -1, *self.in_shape[-2:])
+            x = torch.cat((x, action_cog), dim=1)
+
         expansion_dims = ((hxs.dim() - 1) * (1,))
         hxs = hxs * (1 - done.view(-1, *expansion_dims))
         hxs = hxs.split(self.state_channels, dim=1)
@@ -234,6 +244,7 @@ class RecursivePolicy(nn.Module):
             twoAM=False,
             random_cog_fraction=0.0,
             fixed_recursive_depth=1,
+            append_a_cog=False,
             **kwargs):
         super(RecursivePolicy, self).__init__()
 
@@ -251,11 +262,13 @@ class RecursivePolicy(nn.Module):
             self.transition = RNNTransition(
                 hidden_size=hidden_size,
                 recurse_depth=fixed_recursive_depth,
+                append_a_cog=append_a_cog,
             )
         elif architecture == "crnn":
             self.transition = CRNNTransition(
                 state_channels=state_channels,
                 recurse_depth=fixed_recursive_depth,
+                append_a_cog=append_a_cog,
             )
         else:
             raise NotImplementedError
@@ -298,10 +311,10 @@ class RecursivePolicy(nn.Module):
         else:
             return (0,)
 
-    def forward(self, obs, rnn_h, done):
+    def forward(self, obs, rnn_h, done, a_cog=None):
         x = self.encoder(obs.float())
         x = self.enc2trans(x)
-        x, rnn_h = self.transition(x, rnn_h, done)
+        x, rnn_h = self.transition(x, rnn_h, done, a_cog)
         x = self.trans2ac(x)
         value = self.ac_env.forward_critic(x)
         dist = self.ac_env.forward_actor(x)
@@ -346,10 +359,10 @@ class RecursivePolicy(nn.Module):
 
         return env_policy, cog_policy, rnn_h
 
-    def get_value(self, obs, rnn_h, done):
-        x = self.encoder(obs.float())
-        x = self.enc2trans(x)
-        x, rnn_h = self.transition(x, rnn_h, done)
-        x = self.trans2ac(x)
-        value = self.ac_env.forward_critic(x)
-        return value
+    # def get_value(self, obs, rnn_h, done):
+    #     x = self.encoder(obs.float())
+    #     x = self.enc2trans(x)
+    #     x, rnn_h = self.transition(x, rnn_h, done)
+    #     x = self.trans2ac(x)
+    #     value = self.ac_env.forward_critic(x)
+    #     return value

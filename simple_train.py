@@ -18,7 +18,7 @@ import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
 from rl_trickery.envs import make_envs
-from rl_trickery.models.tricky_policy_networks import RecursivePolicy
+from rl_trickery.models.tricky_policy_networks import RecursivePolicy, PolicyOutput
 from rl_trickery.agents.tricky_agents import A2C, TrickyRollout
 
 
@@ -62,6 +62,7 @@ class Workspace(object):
         self.net = RecursivePolicy(
             obs_space=self.env.observation_space,
             action_space=self.env.action_space,
+            twoAM=self.cfg.agent.algo_params.twoAM,
             **self.cfg.agent.network_params
         )
         self.cfg.model_params_count = utils.get_n_params(self.net)
@@ -90,6 +91,10 @@ class Workspace(object):
         obs = self.eval_envs.reset()
         rnn_h = torch.zeros((2,) + self.net.recurrent_hidden_state_size()).to(self.device)
         done = torch.zeros((2, 1)).to(self.device)
+        cog_policy = PolicyOutput(
+            value=None, action=torch.ones((self.env.num_envs, 1), device=self.device).long(),
+            action_log_probs=None, dist_entropy=None
+        )
         batched_obs_seq = []
         for i in range(50000):
             if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:
@@ -98,7 +103,7 @@ class Workspace(object):
             if len(self.env.observation_space.shape) == 3:
                 batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
 
-            env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done)
+            env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
             value, action, _, _ = env_policy
 
             pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
@@ -126,21 +131,24 @@ class Workspace(object):
         timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
 
         next_obs = self.env.reset()
-        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
-        done = torch.zeros((self.env.num_envs, 1)).to(self.device)
+        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size(), device=self.device)
+        done = torch.zeros((self.env.num_envs, 1), device=self.device)
+        cog_policy = PolicyOutput(
+            value=None, action=torch.ones((self.env.num_envs, 1), device=self.device).long(),
+            action_log_probs=None, dist_entropy=None
+        )
 
         while timesteps_cnt < self.cfg.num_timesteps:
             start_time = time.time()
             steps_since_update = 0
             safety_cnt = 0
 
-            # for t in range(self.cfg.agent.num_steps):  # old loop management
             while steps_since_update < self.cfg.agent.num_steps * self.env.num_envs:
                 safety_cnt += 1
                 if safety_cnt > 100 * self.env.num_envs:
                     break
                 obs = next_obs
-                env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done)
+                env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
                 value, action, action_logp, action_entropy = env_policy
 
                 pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
@@ -160,7 +168,7 @@ class Workspace(object):
 
             timesteps_cnt += steps_since_update * self.cfg.env.frame_skip
             with torch.no_grad():
-                env_policy, cog_policy, _ = self.net(next_obs, rnn_h, done)
+                env_policy, cog_policy, _ = self.net(obs, rnn_h, done, cog_policy.action)
                 self.buffer.v.append(env_policy.value)
                 self.buffer.v_c.append(cog_policy.value)
 

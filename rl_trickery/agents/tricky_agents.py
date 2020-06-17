@@ -157,13 +157,6 @@ class TrickyRollout(object):
                 use_timeout=use_timeout,
                 rescale=rescale,
             )
-            # self.v_target = compute_returns(
-            #     self.v, self.r,
-            #     self.done, self.timeout,
-            #     gamma=gamma,
-            #     use_timeout=use_timeout,
-            #     rescale=rescale,
-            # )
 
 
 class A2C(object):
@@ -187,6 +180,7 @@ class A2C(object):
             smooth_value_loss=False,
             reward_rescale=False,
             update_cognitive_values=False,
+            twoAM=False,
     ):
         self.net = net
         self.buf = buffer

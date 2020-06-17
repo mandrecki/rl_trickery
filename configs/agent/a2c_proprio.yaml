@@ -9,7 +9,9 @@ network_params:
   hidden_size: 64
   random_cog_fraction: 0.
   fixed_recursive_depth: 1
+  append_a_cog: true
 algo_params:
+  twoAM: false
   lr: 1e-3
   gamma: 0.99
   value_loss_coef: 0.5
