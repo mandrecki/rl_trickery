@@ -19,20 +19,10 @@ COMMON_TRAIN_FORMAT = [
 
 COMMON_EVAL_FORMAT = [
     ('episode', 'E', 'int'), ('step', 'S', 'int'), ('timestep', 'T', 'int'),
-    ('episode_reward', 'R', 'float')
+    ('episode_reward', 'R', 'float'), ('fraction_timeouts', 'fracTimeOut', 'float')
 ]
 
 AGENT_TRAIN_FORMAT = {
-    'drq': [('batch_reward', 'BR', 'float'), ('actor_loss', 'ALOSS', 'float'),
-            ('critic_loss', 'CLOSS', 'float'),
-            ('alpha_loss', 'TLOSS', 'float'), ('alpha_value', 'TVAL', 'float'),
-            ('actor_entropy', 'AENT', 'float')],
-    'ppo': [
-        ('value', 'CVALUE', 'float'),
-        # ('batch_return', 'BR', 'float'),
-        ('loss_actor', 'ALOSS', 'float'),
-        ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
-    ],
     'a2c': [
         ('value', 'CVALUE', 'float'),
         # ('batch_return', 'BR', 'float'),
@@ -46,11 +36,6 @@ AGENT_TRAIN_FORMAT = {
         ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
         ('loss_actor_cog', 'ACOGLOSS', 'float'), ('loss_critic_cog', 'CCOGLOSS', 'float'),
         ('loss_entropy_cog', 'COGENT', 'float'),
-    ],
-    'acktr': [
-        ('value', 'CVALUE', 'float'),
-        ('batch_reward', 'BR', 'float'), ('loss_actor', 'ALOSS', 'float'),
-        ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
 }
 

@@ -25,7 +25,6 @@ from rl_trickery.agents.tricky_agents import A2C, TrickyRollout
 class Workspace(object):
     def __init__(self, cfg):
         self.work_dir = os.getcwd()
-        # print(f'workspace: {self.work_dir}')
 
         self.cfg = cfg
         # init loggers
@@ -54,7 +53,7 @@ class Workspace(object):
         # init eval envs
         self.eval_envs = make_envs(
             **self.cfg.env,
-            num_envs=2,
+            num_envs=1,
             seed=self.cfg.seed+1337,
         )
 
@@ -87,19 +86,17 @@ class Workspace(object):
             self.work_dir if cfg.save_video else None)
 
     def evaluate(self, step):
-        eval_episode_rewards = deque()
+        eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
+        timeout_cnt = 0.0
         obs = self.eval_envs.reset()
-        rnn_h = torch.zeros((2,) + self.net.recurrent_hidden_state_size()).to(self.device)
-        done = torch.zeros((2, 1)).to(self.device)
+        rnn_h = torch.zeros((self.eval_envs.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
+        done = torch.zeros((self.eval_envs.num_envs, 1)).to(self.device)
         cog_policy = PolicyOutput(
-            value=None, action=torch.ones((self.env.num_envs, 1), device=self.device).long(),
+            value=None, action=torch.ones((self.eval_envs.num_envs, 1), device=self.device).long(),
             action_log_probs=None, dist_entropy=None
         )
         batched_obs_seq = []
-        for i in range(50000):
-            if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:
-                break
-
+        while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
             if len(self.env.observation_space.shape) == 3:
                 batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
 
@@ -114,13 +111,16 @@ class Workspace(object):
             for info in infos:
                 if 'episode' in info.keys():
                     eval_episode_rewards.append(info['episode']['r'])
+                    if 'TimeLimit.truncated' in info.keys():
+                        timeout_cnt += 1
 
         if len(self.env.observation_space.shape) == 3:
             self.video_recorder.init()
             self.video_recorder.capture(batched_obs_seq)
             self.video_recorder.save(f'{step}.mp4')
 
-        return eval_episode_rewards
+        timeout_fraction = timeout_cnt/self.cfg.num_eval_episodes
+        return eval_episode_rewards, timeout_fraction
 
     def run(self):
         timesteps_cnt = 0
@@ -191,8 +191,9 @@ class Workspace(object):
 
             if (updates_cnt) % (1+self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
                 with torch.no_grad():
-                    eval_rewards = self.evaluate(timesteps_cnt)
+                    eval_rewards, eval_fraction_timeouts = self.evaluate(timesteps_cnt)
                 self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
+                self.logger.log("eval/fraction_timeouts", eval_fraction_timeouts, updates_cnt)
                 self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)
                 self.logger.dump(updates_cnt)
 
