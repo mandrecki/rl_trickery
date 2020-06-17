@@ -11,6 +11,7 @@ network_params:
   fixed_recursive_depth: 1
   append_a_cog: true
   append_coords: true
+  pool_and_inject: true
 algo_params:
   twoAM: false
   lr: 1e-3

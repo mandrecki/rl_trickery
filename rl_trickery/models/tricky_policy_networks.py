@@ -8,6 +8,7 @@ import gym
 from rl_trickery.models.distributions import Bernoulli, Categorical, DiagGaussian, init
 from rl_trickery.models.conv_lstm import ConvLSTMCell
 from rl_trickery.models.coord_conv import CoordConv
+from rl_trickery.models.pool_and_inject import PoolAndInject
 
 
 class Discrete2OneHot(nn.Module):
@@ -75,12 +76,12 @@ class RNNTransition(nn.Module):
 
         return x, hxs
 
-
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False):
+    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False):
         super(CRNNTransition, self).__init__()
         self.append_a_cog = append_a_cog
         self.append_coords = append_coords
+        self.pool_inject = pool_inject
         self.recurse_depth = recurse_depth
         self.in_shape = (state_channels,) + spatial_shape
         self.out_shape = (state_channels,) + spatial_shape
@@ -91,12 +92,18 @@ class CRNNTransition(nn.Module):
         self.conv_lstm = ConvLSTMCell(
             input_dim=n_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
+        if self.pool_inject:
+            self.pj_net = PoolAndInject(spatial_shape, state_channels)
+
         if self.append_coords:
             self.coord_conv = CoordConv(spatial_shape)
 
         assert recurse_depth >= 1
 
     def forward(self, x, hxs, done, action_cog):
+        if self.pool_inject:
+            x = self.pj_net(x)
+
         if self.append_a_cog:
             # cover spatial dimension and cat to channel
             action_cog = action_cog.float().view((-1, 1, 1, 1)).expand(-1, -1, *self.in_shape[-2:])
@@ -255,6 +262,7 @@ class RecursivePolicy(nn.Module):
             fixed_recursive_depth=1,
             append_a_cog=False,
             append_coords=False,
+            pool_and_inject=False,
     ):
         super(RecursivePolicy, self).__init__()
 
@@ -282,6 +290,7 @@ class RecursivePolicy(nn.Module):
                 recurse_depth=fixed_recursive_depth,
                 append_a_cog=append_a_cog,
                 append_coords=append_coords,
+                pool_inject=pool_and_inject,
             )
         else:
             raise NotImplementedError
