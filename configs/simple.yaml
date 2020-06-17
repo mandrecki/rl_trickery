@@ -1,19 +1,20 @@
-num_timesteps: 2e6
+num_timesteps: 1e6
 device: cuda:0
 seed: 0
 num_envs: ${agent.num_envs}
 model_params_count: ???
 
-log_timestep_interval: 1e4
+log_timestep_interval: 1e3
 log_save_tb: true
 save_video: true
 eval_timestep_interval: 1e5
-num_eval_episodes: 16
+num_eval_episodes: 32
 
 defaults:
 #  - env: atari
-  - env: mazelab
+#  - env: mazelab
 #  - env: cartpole
+  - env: frozenlake
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris

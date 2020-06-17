@@ -48,8 +48,9 @@ class NoTransition(nn.Module):
 
 
 class RNNTransition(nn.Module):
-    def __init__(self, hidden_size, action_cog=False):
+    def __init__(self, hidden_size, recurse_depth=1):
         super(RNNTransition, self).__init__()
+        self.recurse_depth = recurse_depth
         self.in_shape = (hidden_size,)
         self.out_shape = (hidden_size,)
         # self.in_shape += int(action_cog)
@@ -61,17 +62,21 @@ class RNNTransition(nn.Module):
             elif 'weight' in name:
                 nn.init.orthogonal_(param)
 
+        assert recurse_depth >= 1
+
     def forward(self, x, hxs, done, action_cog=None):
         hxs = hxs * (1 - done.view(-1, 1))
-        hxs = self.gru(x, hxs)
+        for i in range(self.recurse_depth):
+            hxs = self.gru(x, hxs)
         x = hxs
 
         return x, hxs
 
 
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, action_cog=False):
+    def __init__(self, state_channels, recurse_depth=1):
         super(CRNNTransition, self).__init__()
+        self.recurse_depth = recurse_depth
         self.in_shape = (state_channels, 7, 7)
         self.out_shape = (state_channels, 7, 7)
         self.state_channels = state_channels
@@ -79,16 +84,18 @@ class CRNNTransition(nn.Module):
         self.conv_lstm = ConvLSTMCell(
             input_dim=state_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
+        assert recurse_depth >= 1
 
-    def forward(self, x, hxs, done):
+    def forward(self, x, hxs, done, action_cog=None):
         expansion_dims = ((hxs.dim() - 1) * (1,))
         hxs = hxs * (1 - done.view(-1, *expansion_dims))
         hxs = hxs.split(self.state_channels, dim=1)
 
+        for i in range(self.recurse_depth):
+            hxs = self.conv_lstm(x, hxs)
 
-        h, c = self.conv_lstm(x, hxs)
-
-        hxs = torch.cat((h, c), dim=1)
+        h, c = hxs
+        hxs = torch.cat(hxs, dim=1)
         return h, hxs
 
 
@@ -224,13 +231,13 @@ class RecursivePolicy(nn.Module):
             obs_space, action_space,
             architecture,
             state_channels, hidden_size,
-            action_cog=False,
+            twoAM=False,
             random_cog_fraction=0.0,
+            fixed_recursive_depth=1,
             **kwargs):
         super(RecursivePolicy, self).__init__()
 
-        assert 0.0 <= random_cog_fraction <= 1.0
-        self.twoAM = action_cog
+        self.twoAM = twoAM
         self.random_cog_fraction = random_cog_fraction
         self.hidden_size = hidden_size
         self.architecture = architecture
@@ -243,12 +250,12 @@ class RecursivePolicy(nn.Module):
         elif architecture == "rnn":
             self.transition = RNNTransition(
                 hidden_size=hidden_size,
-                action_cog=False,
+                recurse_depth=fixed_recursive_depth,
             )
         elif architecture == "crnn":
             self.transition = CRNNTransition(
                 state_channels=state_channels,
-                action_cog=False,
+                recurse_depth=fixed_recursive_depth,
             )
         else:
             raise NotImplementedError
@@ -279,6 +286,11 @@ class RecursivePolicy(nn.Module):
             )
 
         self.train()
+
+        assert 0.0 <= random_cog_fraction <= 1.0
+        if fixed_recursive_depth:
+            assert random_cog_fraction == 0.0
+            assert self.is_recurrent
 
     def recurrent_hidden_state_size(self):
         if self.is_recurrent:

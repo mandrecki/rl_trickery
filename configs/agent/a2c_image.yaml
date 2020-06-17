@@ -7,7 +7,8 @@ network_params:
   architecture: "crnn"
   state_channels: 32
   hidden_size: 256
-  random_cog_fraction: 0.5
+  random_cog_fraction: 0.
+  fixed_recursive_depth: 5
 algo_params:
   lr: 7e-4
   gamma: 0.99
