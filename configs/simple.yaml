@@ -1,20 +1,21 @@
-num_timesteps: 1e6
+num_timesteps: 1e7
 device: cuda:0
 seed: 0
 num_envs: ${agent.num_envs}
 model_params_count: ???
+name: any
 
-log_timestep_interval: 1e3
+log_timestep_interval: 1e4
 log_save_tb: true
 save_video: true
-eval_timestep_interval: 1e5
+eval_timestep_interval: 5e5
 num_eval_episodes: 32
 
 defaults:
 #  - env: atari
-#  - env: mazelab
+  - env: mazelab
 #  - env: cartpole
-  - env: frozenlake
+#  - env: frozenlake
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: tetris
@@ -26,10 +27,10 @@ defaults:
 # hydra configuration
 hydra:
   run:
-    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${name}
   sweep:
-    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.num}
+    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}_${name}
+    subdir: ${name}_${hydra.job.num}
 #  sweeper:
 #    params:
 #      optim:

@@ -23,5 +23,4 @@ algo_params:
   smooth_value_loss: true
   reward_rescale: true
   update_cognitive_values: false
-#  optimizer_type: adam
   optimizer_type: rmsprop
