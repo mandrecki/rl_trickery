@@ -4,11 +4,11 @@ num_envs: 16
 num_steps: 10
 device: ${device}
 network_params:
-  architecture: "crnn"
+  architecture: "ff"
   state_channels: 32
   hidden_size: 256
   random_cog_fraction: 0.
-  fixed_recursive_depth: 5
+  fixed_recursive_depth: 1
 algo_params:
   lr: 7e-4
   gamma: 0.99

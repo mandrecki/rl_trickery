@@ -288,7 +288,7 @@ class RecursivePolicy(nn.Module):
         self.train()
 
         assert 0.0 <= random_cog_fraction <= 1.0
-        if fixed_recursive_depth:
+        if fixed_recursive_depth > 1:
             assert random_cog_fraction == 0.0
             assert self.is_recurrent
 
