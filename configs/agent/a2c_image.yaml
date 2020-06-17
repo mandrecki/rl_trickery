@@ -10,6 +10,7 @@ network_params:
   random_cog_fraction: 0.0
   fixed_recursive_depth: 1
   append_a_cog: true
+  append_coords: false
 algo_params:
   twoAM: false
   lr: 1e-3

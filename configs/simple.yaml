@@ -13,11 +13,11 @@ num_eval_episodes: 32
 
 defaults:
 #  - env: atari
-  - env: mazelab
+#  - env: mazelab
 #  - env: cartpole
 #  - env: frozenlake
 #  - env: lunarlander
-#  - env: pixelcopter
+  - env: pixelcopter
 #  - env: tetris
   - agent: a2c_image
 #  - agent: a2c_proprio

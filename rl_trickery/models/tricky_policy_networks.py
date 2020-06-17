@@ -2,13 +2,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian
-from a2c_ppo_acktr.utils import init
-
-from rl_trickery.models.conv_lstm import ConvLSTMCell
 import collections
 import gym
+
+from rl_trickery.models.distributions import Bernoulli, Categorical, DiagGaussian, init
+from rl_trickery.models.conv_lstm import ConvLSTMCell
+from rl_trickery.models.coord_conv import CoordConv
 
 
 class Discrete2OneHot(nn.Module):
@@ -78,17 +77,23 @@ class RNNTransition(nn.Module):
 
 
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, recurse_depth=1, append_a_cog=False):
+    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False):
         super(CRNNTransition, self).__init__()
         self.append_a_cog = append_a_cog
+        self.append_coords = append_coords
         self.recurse_depth = recurse_depth
-        self.in_shape = (state_channels, 7, 7)
-        self.out_shape = (state_channels, 7, 7)
+        self.in_shape = (state_channels,) + spatial_shape
+        self.out_shape = (state_channels,) + spatial_shape
         self.state_channels = state_channels
-        self.recurrent_hidden_state_size = (2*state_channels, 7, 7)
+        self.recurrent_hidden_state_size = (2*state_channels,) + spatial_shape
+
+        n_channels = state_channels + int(append_a_cog) + 3*int(append_coords)
         self.conv_lstm = ConvLSTMCell(
-            input_dim=state_channels+int(append_a_cog), hidden_dim=state_channels, kernel_size=(3,3), bias=True,
+            input_dim=n_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
+        if self.append_coords:
+            self.coord_conv = CoordConv(spatial_shape)
+
         assert recurse_depth >= 1
 
     def forward(self, x, hxs, done, action_cog):
@@ -96,6 +101,9 @@ class CRNNTransition(nn.Module):
             # cover spatial dimension and cat to channel
             action_cog = action_cog.float().view((-1, 1, 1, 1)).expand(-1, -1, *self.in_shape[-2:])
             x = torch.cat((x, action_cog), dim=1)
+
+        if self.append_coords:
+            x = self.coord_conv(x)
 
         expansion_dims = ((hxs.dim() - 1) * (1,))
         hxs = hxs * (1 - done.view(-1, *expansion_dims))
@@ -240,12 +248,14 @@ class RecursivePolicy(nn.Module):
             self,
             obs_space, action_space,
             architecture,
-            state_channels, hidden_size,
+            state_channels=32,
+            hidden_size=128,
             twoAM=False,
             random_cog_fraction=0.0,
             fixed_recursive_depth=1,
             append_a_cog=False,
-            **kwargs):
+            append_coords=False,
+    ):
         super(RecursivePolicy, self).__init__()
 
         self.twoAM = twoAM
@@ -253,6 +263,7 @@ class RecursivePolicy(nn.Module):
         self.hidden_size = hidden_size
         self.architecture = architecture
         self.is_recurrent = architecture in ["rnn", "crnn"]
+        self.spatial_state_shape = (7, 7) if architecture == "crnn" else ()  # dictated by layer choice in encoder
 
         self.encoder = Encoder(obs_space, hidden_size, state_channels)
 
@@ -267,8 +278,10 @@ class RecursivePolicy(nn.Module):
         elif architecture == "crnn":
             self.transition = CRNNTransition(
                 state_channels=state_channels,
+                spatial_shape=self.spatial_state_shape,
                 recurse_depth=fixed_recursive_depth,
                 append_a_cog=append_a_cog,
+                append_coords=append_coords,
             )
         else:
             raise NotImplementedError
