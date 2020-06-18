@@ -1,4 +1,4 @@
-num_timesteps: 1e7
+num_timesteps: 1e5
 device: cuda:0
 seed: 0
 num_envs: ${agent.num_envs}
@@ -15,14 +15,14 @@ defaults:
 #  - env: atari
 #  - env: mazelab
 #  - env: minipacman
-#  - env: cartpole
+  - env: cartpole
 #  - env: frozenlake
 #  - env: lunarlander
 #  - env: pixelcopter
-  - env: minatar
+#  - env: minatar
 #  - env: tetris
-  - agent: a2c_image
-#  - agent: a2c_proprio
+#  - agent: a2c_image
+  - agent: a2c_proprio
 #  - hydra/sweeper: nevergrad
 
 

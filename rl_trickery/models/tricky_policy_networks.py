@@ -389,10 +389,3 @@ class RecursivePolicy(nn.Module):
 
         return env_policy, cog_policy, rnn_h
 
-    # def get_value(self, obs, rnn_h, done):
-    #     x = self.encoder(obs.float())
-    #     x = self.enc2trans(x)
-    #     x, rnn_h = self.transition(x, rnn_h, done)
-    #     x = self.trans2ac(x)
-    #     value = self.ac_env.forward_critic(x)
-    #     return value

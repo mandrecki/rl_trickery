@@ -1,6 +1,6 @@
 # @package _group_
 name: a2c
-num_envs: 8
+num_envs: 1
 num_steps: 10
 device: ${device}
 network_params:
@@ -13,7 +13,7 @@ network_params:
   append_coords: false
   pool_and_inject: false
 algo_params:
-  twoAM: false
+  twoAM: true
   lr: 1e-3
   gamma: 0.99
   value_loss_coef: 0.5

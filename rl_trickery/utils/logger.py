@@ -23,12 +23,12 @@ COMMON_EVAL_FORMAT = [
 ]
 
 AGENT_TRAIN_FORMAT = {
-    'a2c': [
+    'a2c_old': [
         ('value', 'CVALUE', 'float'),
         # ('batch_return', 'BR', 'float'),
         ('loss_actor', 'ALOSS', 'float'), ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
     ],
-    'a2c_2am': [
+    'a2c': [
         ('act', 'ACT', 'float'),
         ('value', 'CVALUE', 'float'),
         ('value_cog', 'COGVALUE', 'float'),
