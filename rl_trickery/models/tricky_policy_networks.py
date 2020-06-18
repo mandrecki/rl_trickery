@@ -67,7 +67,7 @@ class RNNTransition(nn.Module):
 
     def forward(self, x, hxs, done, action_cog):
         if self.append_a_cog:
-            x = torch.cat((x, action_cog.float()), dim=1)
+            x = torch.cat((x, action_cog.float().detach()), dim=1)
 
         hxs = hxs * (1 - done.view(-1, 1))
         for i in range(self.recurse_depth):
@@ -75,6 +75,7 @@ class RNNTransition(nn.Module):
         x = hxs
 
         return x, hxs
+
 
 class CRNNTransition(nn.Module):
     def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False):
@@ -106,7 +107,7 @@ class CRNNTransition(nn.Module):
 
         if self.append_a_cog:
             # cover spatial dimension and cat to channel
-            action_cog = action_cog.float().view((-1, 1, 1, 1)).expand(-1, -1, *self.in_shape[-2:])
+            action_cog = action_cog.detach().float().view((-1, 1, 1, 1)).expand(-1, -1, *self.in_shape[-2:])
             x = torch.cat((x, action_cog), dim=1)
 
         if self.append_coords:
@@ -206,6 +207,13 @@ class Encoder(nn.Module):
                     # input (3, 9, 9)
                     init_relu(nn.Conv2d(64, state_channels, 3, stride=1)), nn.ReLU(),
                     # input (3, 7, 7)
+                )
+            # minipacman 15x19
+            elif im_size == 15:
+                self.net = nn.Sequential(
+                    init_relu(nn.Conv2d(n_channels, 32, (5, 5), stride=1)), nn.ReLU(),
+                    init_relu(nn.Conv2d(32, 64, (3, 5), stride=1)), nn.ReLU(),
+                    init_relu(nn.Conv2d(64, state_channels, (3, 5), stride=1)), nn.ReLU(),
                 )
             else:
                 raise NotImplementedError

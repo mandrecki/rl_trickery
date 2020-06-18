@@ -3,7 +3,6 @@ env_id: FrozenLake-v0
 env_kwargs: {}
 max_timesteps: 200
 obs_type: proprioceptive
-image_size: 64
 to_grayscale: false
 episode_life: false
 clip_rewards: false

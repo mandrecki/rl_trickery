@@ -1,9 +1,7 @@
 # @package _group_
-env_id: PixelCopter-v0
-env_kwargs:
-  width: 64
-  height: 64
-#max_timesteps: 1000
+env_id: Freeway-MinAtar-v0
+env_kwargs: {}
+max_timesteps: 400
 obs_type: image
 image_size:
   - 64

@@ -3,10 +3,10 @@ env_id: CartPole-v0
 env_kwargs: {}
 max_timesteps: 200
 obs_type: proprioceptive
-image_size: 64
 to_grayscale: false
 episode_life: false
 clip_rewards: false
+reward_rescale: true
 cognitive_pause: 1337
 frame_stack: 1
 frame_skip: 1

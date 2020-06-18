@@ -1,6 +1,6 @@
 env:
   env_id: TetrisA-v2
-  image_size: 64
+  image_size: (64, 64)
   to_grayscale: true
   episode_life: false
   clip_rewards: false

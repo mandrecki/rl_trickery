@@ -9,9 +9,9 @@ network_params:
   hidden_size: 64
   random_cog_fraction: 0.
   fixed_recursive_depth: 1
-  append_a_cog: true
-  append_coords: true
-  pool_and_inject: true
+  append_a_cog: false
+  append_coords: false
+  pool_and_inject: false
 algo_params:
   twoAM: false
   lr: 1e-3
@@ -23,6 +23,6 @@ algo_params:
   max_grad_norm: 0.2
   use_timeout: true
   smooth_value_loss: true
-  reward_rescale: true
+  reward_rescale: ${env.reward_rescale}
   update_cognitive_values: false
   optimizer_type: rmsprop

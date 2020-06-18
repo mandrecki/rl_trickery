@@ -26,5 +26,8 @@ class CoordConv(nn.Module):
         if batch_size > self.coords.size(0):
             self.coords = self.coords[:1].expand(batch_size, -1, -1, -1)
 
+        if x.device != self.coords.device:
+            self.coords = self.coords.to(x.device)
+
         x = torch.cat((x, self.coords[:batch_size, ...].detach()), dim=1)
         return x

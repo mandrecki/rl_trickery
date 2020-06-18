@@ -6,6 +6,9 @@ import gym
 import gym_tetris
 import gym_ple
 import gym_minigrid
+import gym_minipacman
+import gym_minatar
+import gym_pygame
 from gym_tetris.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 from gym.wrappers import TimeLimit
@@ -38,9 +41,17 @@ DMC2_ENVS = [
 ]
 CONTROL_SUITE_ACTION_REPEATS = {"cartpole": 8, "reacher": 4, "finger": 2, "cheetah": 4, "ball_in_cup": 2, "walker": 2}
 
+MINIPACMAN_ENVS = [
+    "RegularMiniPacmanNoFrameskip-v0",
+    "AvoidMiniPacmanNoFrameskip-v0",
+    "HunMiniPacmanNoFrameskip-v0",
+    "AmbushMiniPacmanNoFrameskip-v0",
+    "RushMiniPacmanNoFrameskip-v0",
+]
+
 UPSCALE_ENVS = [
     "Mazelab-v0",
-]
+] # + MINIPACMAN_ENVS
 
 CROP_ENVS = {
     "TetrisA-v2": (45, 211, 93, 178),  # only blocks visible
@@ -53,7 +64,7 @@ def make_env(
         seed=0,
         pytorch_dim_order=True,
         obs_type="image",
-        image_size=84,
+        image_size=(84, 84),
         frame_skip=1,
         cognitive_pause=False,
         random_initial_steps=0,
@@ -99,6 +110,7 @@ def make_env(
     if clip_rewards:
         env = ClipRewardEnv(env)
 
+    image_size = tuple(image_size)
     # if image env
     if obs_type == "image":
         assert len(env.observation_space.shape) == 3
@@ -107,11 +119,10 @@ def make_env(
         # Crop and resize if necessary
         if env_id in CROP_ENVS.keys():
             env = CropImage(env, CROP_ENVS.get(env_id))
-        target_size = (image_size, image_size)
         if env_id in UPSCALE_ENVS:
-            env = ResizeImage(env, target_size, antialias=True)
-        elif env.observation_space.shape[0:2] != target_size:
-            env = ResizeImage(env, target_size, antialias=False)
+            env = ResizeImage(env, image_size, antialias=True)
+        elif env.observation_space.shape[0:2] != image_size:
+            env = ResizeImage(env, image_size, antialias=False)
         if pytorch_dim_order:
             env = TransposeImage(env)
     elif obs_type == "proprioceptive":
