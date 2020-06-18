@@ -10,6 +10,7 @@ log_save_tb: true
 save_video: true
 eval_timestep_interval: 5e4
 num_eval_episodes: 32
+num_eval_envs: ${env.num_eval_envs}
 
 defaults:
 #  - env: atari
@@ -19,7 +20,8 @@ defaults:
 #  - env: frozenlake
 #  - env: lunarlander
 #  - env: pixelcopter
-  - env: minatar
+#  - env: minatar
+  - env: snake
 #  - env: tetris
   - agent: a2c_image
 #  - agent: a2c_proprio

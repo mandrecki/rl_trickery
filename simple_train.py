@@ -54,7 +54,7 @@ class Workspace(object):
         # init eval envs
         self.eval_envs = make_envs(
             **self.cfg.env,
-            num_envs=1,
+            num_envs=self.cfg.num_eval_envs,
             seed=self.cfg.seed+1337,
         )
 

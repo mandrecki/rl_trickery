@@ -13,3 +13,4 @@ frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
+num_eval_envs: ${num_eval_episodes}

@@ -1,25 +1,22 @@
 # @package _group_
-env_id: Mazelab-v0
+env_id: Snake-v0
 env_kwargs:
-  maze_kind: maze
-  maze_size: 15
-  maze_fixed: false
-  goal_fixed: false
-  goal_reward: false
-  wall_reward: false
-max_timesteps: 250
+  width: 64
+  height: 64
+  init_length: 30
+max_timesteps: 500
 obs_type: image
 image_size:
   - 64
   - 64
 to_grayscale: false
 episode_life: false
-reward_rescale: false
 clip_rewards: false
+reward_rescale: true
 cognitive_pause: 1337
-frame_stack: 1
-frame_skip: 1
+frame_stack: 4
+frame_skip: 4
 random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
-num_eval_envs: 2
+num_eval_envs: ${num_eval_episodes}
