@@ -75,7 +75,6 @@ class A2C_2AM():
             env_loss = (value_loss * self.value_loss_coef +
                         dist_entropy * self.entropy_coef)
 
-
         returns_cog = self.compute_cognitive_returns(
             rollouts.value_cog_preds[-1],
             advantages, rollouts.actions_cog,

@@ -174,7 +174,7 @@ class Workspace(object):
                 self.buffer.v_c.append(cog_policy.value)
 
             # value_loss, action_loss, entropy_loss = self.agent.update()  # non-cognitive working update
-            value_loss, action_loss, entropy_loss = self.agent.cognitive_update()
+            env_loss, cog_loss = self.agent.cognitive_update()
             updates_cnt += 1
 
             if (updates_cnt) % (1+self.cfg.log_timestep_interval//timesteps_per_update) == 0:
@@ -185,9 +185,16 @@ class Workspace(object):
                 self.logger.log('train/timestep', timesteps_cnt, updates_cnt)
                 self.logger.log('train/duration', end_time - start_time, updates_cnt)
                 self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), updates_cnt)
-                self.logger.log('train_loss/critic', value_loss, updates_cnt)
-                self.logger.log('train_loss/actor', action_loss, updates_cnt)
-                self.logger.log('train_loss/entropy', entropy_loss, updates_cnt)
+                self.logger.log('train_loss/critic', env_loss.value, updates_cnt)
+                self.logger.log('train_loss/actor', env_loss.action, updates_cnt)
+                self.logger.log('train_loss/entropy', env_loss.entropy, updates_cnt)
+                if self.agent.twoAM:
+                    self.logger.log('train/value_cog', torch.stack(self.buffer.v_c).mean(), updates_cnt)
+                    self.logger.log('train/act', torch.stack(self.buffer.a_c).float().mean(), updates_cnt)
+                    self.logger.log('train_loss/critic_cog', cog_loss.value, updates_cnt)
+                    self.logger.log('train_loss/actor_cog', cog_loss.action, updates_cnt)
+                    self.logger.log('train_loss/entropy_cog', cog_loss.entropy, updates_cnt)
+
                 self.logger.dump(updates_cnt)
 
             if (updates_cnt) % (1+self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
