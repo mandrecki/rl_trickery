@@ -13,7 +13,9 @@ network_params:
   append_coords: true
   pool_and_inject: false
 algo_params:
-  twoAM: false
+  twoAM: true
+  cognition_coef: 1.0
+  cognition_cost: 1.0
   lr: 7e-4
   gamma: 0.99
   value_loss_coef: 0.5
@@ -22,7 +24,7 @@ algo_params:
   alpha: 0.99
   max_grad_norm: 0.1
   use_timeout: true
-  smooth_value_loss: true
+  smooth_value_loss: false
   reward_rescale: ${env.reward_rescale}
   update_cognitive_values: false
   optimizer_type: rmsprop

@@ -92,7 +92,7 @@ class Workspace(object):
                 max_grad_norm=cfg.agent.max_grad_norm,
                 long_horizon=cfg.agent.long_horizon,
                 cognition_cost=cfg.agent.cognition_cost,
-                cognitive_coef=cfg.agent.cognitive_coef,
+                cognitive_coef=cfg.agent.cognition_coef,
                 only_action_values=cfg.agent.only_action_values,
             )
         elif cfg.agent.name == 'ppo':

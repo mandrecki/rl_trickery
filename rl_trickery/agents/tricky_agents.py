@@ -145,10 +145,8 @@ class A2C(object):
             alpha=None,
             max_grad_norm=None,
             use_timeout=True,
-            long_horizon=False,
-            cognition_cost=0.1,
-            cognitive_coef=0.5,
-            only_action_values=True,
+            cognition_cost=0.2,
+            cognition_coef=0.5,
             optimizer_type="RMSprop",
             smooth_value_loss=False,
             reward_rescale=False,
@@ -160,7 +158,7 @@ class A2C(object):
 
         self.twoAM = twoAM
         self.gamma_cog = 0.9
-        self.cognitive_coef = cognitive_coef
+        self.cognition_coef = cognition_coef
         self.cognition_cost = cognition_cost
         self.update_cognitive_values = update_cognitive_values
         # self.long_horizon = long_horizon
@@ -224,7 +222,7 @@ class A2C(object):
         v_target = torch.stack(self.buf.v_target)
         a_logp = torch.stack(self.buf.a_logp)
         ent = torch.stack(self.buf.a_ent)
-        a_c = torch.stack(self.buf.a_c)
+        a_c = torch.stack(self.buf.a_c).detach()
 
         if self.smooth_value_loss:
             adv = F.smooth_l1_loss(v, v_target.detach(), reduction="none")
@@ -248,7 +246,7 @@ class A2C(object):
 
         if self.twoAM:
             cog_loss = self.compute_cognitive_loss(full_adv.pow(2), a_c)
-            total_loss += self.cognitive_coef \
+            total_loss += self.cognition_coef \
                           * (cog_loss.value * self.value_loss_coef
                              + cog_loss.action
                              - cog_loss.entropy * self.entropy_coef)
@@ -263,9 +261,9 @@ class A2C(object):
 
     def compute_cognitive_loss(self, env_advantages, a_c):
         # calculate cog rewards
-        value_accuracy = (torch.log2(env_advantages[:-1, ...] + 1e-5) - torch.log2(env_advantages[1:, ...] + 1e-5))\
-                         - self.cognition_cost
-        reward_cog = value_accuracy * (1 - a_c[:-1])
+        value_accuracy = (torch.log2(env_advantages[:-1, ...] + 1e-5) - torch.log2(env_advantages[1:, ...] + 1e-5))
+
+        reward_cog = value_accuracy * a_c[:-1] - self.cognition_cost * (1 - a_c[:-1])
 
         # returns
         with torch.no_grad():
@@ -274,7 +272,7 @@ class A2C(object):
                 self.buf.done, self.buf.timeout,
                 gamma=self.gamma_cog,
                 use_timeout=self.use_timeout,
-                rescale=self.reward_rescale,
+                rescale=True,
             )
 
         v = torch.stack(self.buf.v_c[:-2])
@@ -286,7 +284,7 @@ class A2C(object):
 
         cog_loss = A2CLoss(
             value=adv.pow(2).mean(),
-            action=-(adv.detach() * a_logp).mean(),
+            action=-(-adv.detach() * a_logp).mean(),
             entropy=ent.mean()
         )
 

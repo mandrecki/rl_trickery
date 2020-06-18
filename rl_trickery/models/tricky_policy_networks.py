@@ -373,9 +373,11 @@ class RecursivePolicy(nn.Module):
                 dist_entropy=None
             )
         else:
-            value_cog = self.ac_cog.forward_critic(x)
-            dist_cog = self.ac_cog.forward_actor(x)
-            action_cog = dist.sample()
+            value_cog = self.ac_cog.forward_critic(x.detach())
+            dist_cog = self.ac_cog.forward_actor(x.detach())
+            # value_cog = self.ac_cog.forward_critic(x)
+            # dist_cog = self.ac_cog.forward_actor(x)
+            action_cog = dist_cog.sample()
 
             action_cog_log_probs = dist_cog.log_probs(action)
             dist_cog_entropy = dist_cog.entropy().unsqueeze(-1)

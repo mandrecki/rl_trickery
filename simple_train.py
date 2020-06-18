@@ -146,7 +146,7 @@ class Workspace(object):
 
             while steps_since_update < self.cfg.agent.num_steps * self.env.num_envs:
                 safety_cnt += 1
-                if safety_cnt > 100 * self.env.num_envs:
+                if safety_cnt > 4 * self.cfg.agent.num_steps * self.env.num_envs:
                     break
                 obs = next_obs
                 env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
