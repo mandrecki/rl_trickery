@@ -321,9 +321,11 @@ class RecursivePolicy(nn.Module):
         if self.twoAM:
             self.ac_cog = ActorCritic(
                 action_space=gym.spaces.Discrete(2),
+                # hidden_size=hidden_size + obs_space.shape[0]
                 hidden_size=hidden_size
             )
             self.trans2ac_cog = DimensionalityAdjuster(
+                # in_shape=(2*self.transition.out_shape[0],) + self.transition.out_shape[1:],
                 in_shape=self.transition.out_shape,
                 out_shape=self.ac_cog.in_shape
             )
@@ -342,12 +344,12 @@ class RecursivePolicy(nn.Module):
             return (0,)
 
     def forward(self, obs, rnn_h, done, a_cog=None):
-        x = self.encoder(obs.float())
-        x = self.enc2trans(x)
-        x, rnn_h = self.transition(x, rnn_h, done, a_cog)
-        x = self.trans2ac(x)
-        value = self.ac_env.forward_critic(x)
-        dist = self.ac_env.forward_actor(x)
+        x = self.encoder(obs)
+        x_enc = self.enc2trans(x)
+        x_trans, rnn_h = self.transition(x_enc, rnn_h, done, a_cog)
+        in_ac_env = self.trans2ac(x_trans)
+        value = self.ac_env.forward_critic(in_ac_env)
+        dist = self.ac_env.forward_actor(in_ac_env)
         action = dist.sample()
 
         action_log_probs = dist.log_probs(action)
@@ -373,8 +375,13 @@ class RecursivePolicy(nn.Module):
                 dist_entropy=None
             )
         else:
-            value_cog = self.ac_cog.forward_critic(x.detach())
-            dist_cog = self.ac_cog.forward_actor(x.detach())
+            # in_cog = torch.cat((in_ac_env.detach(), obs), dim=1).detach()
+            # in_cog = torch.cat((x_trans, x_enc), dim=1).detach()
+            in_cog = self.trans2ac(x_trans.detach())
+            value_cog = self.ac_cog.forward_critic(in_cog)
+            dist_cog = self.ac_cog.forward_actor(in_cog)
+            # value_cog = self.ac_cog.forward_critic(in_ac_env.detach())
+            # dist_cog = self.ac_cog.forward_actor(in_ac_env.detach())
             # value_cog = self.ac_cog.forward_critic(x)
             # dist_cog = self.ac_cog.forward_actor(x)
             action_cog = dist_cog.sample()

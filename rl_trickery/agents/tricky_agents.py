@@ -145,6 +145,7 @@ class A2C(object):
             alpha=None,
             max_grad_norm=None,
             use_timeout=True,
+            gamma_cog=0.9,
             cognition_cost=0.2,
             cognition_coef=0.5,
             optimizer_type="RMSprop",
@@ -157,7 +158,7 @@ class A2C(object):
         self.buf = buffer
 
         self.twoAM = twoAM
-        self.gamma_cog = 0.9
+        self.gamma_cog = gamma_cog
         self.cognition_coef = cognition_coef
         self.cognition_cost = cognition_cost
         self.update_cognitive_values = update_cognitive_values
@@ -259,10 +260,20 @@ class A2C(object):
 
         return env_loss, cog_loss
 
-    def compute_cognitive_loss(self, env_advantages, a_c):
-        # calculate cog rewards
-        value_accuracy = (torch.log2(env_advantages[:-1, ...] + 1e-5) - torch.log2(env_advantages[1:, ...] + 1e-5))
+    def compute_cognitive_loss(self, env_advantages_squared, a_c):
+        # REWARD A:
+        # if time flows r=0
+        # otherwise reward improvement in value estimate
+        # always punish thinking with constant
+        value_accuracy = (torch.log2(env_advantages_squared[:-1, ...] + 1e-5) - torch.log2(env_advantages_squared[1:, ...] + 1e-5))
+        # value_accuracy = env_advantages_squared[:-1, ...] - env_advantages_squared[1:, ...]
+        # reward_cog = (1 - a_c[:-1]) * (value_accuracy - self.cognition_cost)
 
+        # REWARD B
+        # if time flows, pay for error
+        # otherwise, pay constant cost
+
+        # REWARD C
         reward_cog = value_accuracy * a_c[:-1] - self.cognition_cost * (1 - a_c[:-1])
 
         # returns
@@ -272,7 +283,7 @@ class A2C(object):
                 self.buf.done, self.buf.timeout,
                 gamma=self.gamma_cog,
                 use_timeout=self.use_timeout,
-                rescale=True,
+                rescale=False,
             )
 
         v = torch.stack(self.buf.v_c[:-2])

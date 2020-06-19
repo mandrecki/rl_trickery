@@ -14,17 +14,18 @@ network_params:
   pool_and_inject: false
 algo_params:
   twoAM: true
-  cognition_coef: 1
-  cognition_cost: 1100000.5
+  cognition_coef: 1.0
+  cognition_cost: 0.1
   lr: 1e-3
   gamma: 0.99
+  gamma_cog: 0.9
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5
   alpha: 0.99
-  max_grad_norm: 10.2
+  max_grad_norm: 0.2
   use_timeout: true
-  smooth_value_loss: false
+  smooth_value_loss: true
   reward_rescale: ${env.reward_rescale}
   update_cognitive_values: false
   optimizer_type: rmsprop
