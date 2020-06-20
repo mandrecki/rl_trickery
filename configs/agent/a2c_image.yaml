@@ -18,6 +18,7 @@ algo_params:
   cognition_cost: 1.0
   lr: 7e-4
   gamma: 0.99
+  gamma_cog: 0.95
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5

@@ -283,7 +283,7 @@ class A2C(object):
                 self.buf.done, self.buf.timeout,
                 gamma=self.gamma_cog,
                 use_timeout=self.use_timeout,
-                rescale=False,
+                rescale=self.reward_rescale,
             )
 
         v = torch.stack(self.buf.v_c[:-2])

@@ -1,9 +1,8 @@
 import copy
 import math
 import os
-import pickle as pkl
-import sys
 import time
+from ast import literal_eval as make_tuple
 
 import numpy as np
 from collections import deque
@@ -13,302 +12,212 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# from a2c_ppo_acktr.model import Policy
-from a2c_ppo_acktr.algo import PPO, A2C_ACKTR
-# from a2c_ppo_acktr.storage import RolloutStorage
-
+torch.backends.cudnn.benchmark = True
 
 import rl_trickery.envs
 import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 from rl_trickery.utils.video import VideoRecorder
 from rl_trickery.envs import make_envs
-from rl_trickery.models.policy_networks import Policy, RecurrentPolicy, PolicyNetwork2AM
-from rl_trickery.data.storage import RolloutStorage, RolloutStorage2AM
-from rl_trickery.agents.a2c_2am import A2C_2AM
-
-# torch.backends.cudnn.benchmark = True
+from rl_trickery.models.tricky_policy_networks import RecursivePolicy, PolicyOutput
+from rl_trickery.agents.tricky_agents import A2C, TrickyRollout
 
 
 class Workspace(object):
     def __init__(self, cfg):
         self.work_dir = os.getcwd()
-        print(f'workspace: {self.work_dir}')
 
         self.cfg = cfg
-
+        # init loggers
         self.logger = Logger(self.work_dir,
                              save_tb=cfg.log_save_tb,
-                             log_frequency=cfg.log_frequency_step,
+                             log_frequency=cfg.log_timestep_interval,
                              agent=cfg.agent.name)
 
-        utils.set_seed_everywhere(cfg.seed)
-        self.device = torch.device(cfg.device)
+        if self.cfg.seed == 0:
+            self.cfg.seed = int(time.time_ns() / 10e9)
+        utils.set_seed_everywhere(self.cfg.seed)
 
+        if torch.cuda.is_available():
+            self.device = torch.device(self.cfg.device)
+        else:
+            self.device = "cpu"
+            self.cfg.device = self.device
+
+        # init envs
         self.env = make_envs(
-            **cfg.env,
+            **self.cfg.env,
             num_envs=cfg.num_envs,
             seed=self.cfg.seed
         )
 
+        # init eval envs
         self.eval_envs = make_envs(
             **self.cfg.env,
-            num_envs=1,
+            num_envs=self.cfg.num_eval_envs,
             seed=self.cfg.seed+1337,
         )
 
-        if self.cfg.agent.name == "a2c_2am":
-            self.net = PolicyNetwork2AM(
-                self.env.observation_space.shape,
-                self.env.action_space,
-                **cfg.agent.network,
-            )
-        else:
-            self.net = RecurrentPolicy(
-                self.env.observation_space.shape,
-                self.env.action_space,
-                **cfg.agent.network,
-            )
+        # init net
+        self.net = RecursivePolicy(
+            obs_space=self.env.observation_space,
+            action_space=self.env.action_space,
+            twoAM=self.cfg.agent.algo_params.twoAM,
+            **self.cfg.agent.network_params
+        )
+        self.cfg.model_params_count = utils.get_n_params(self.net)
+        print("Model params count:", self.cfg.model_params_count)
+
         self.net.to(self.device)
 
-        if cfg.agent.name == 'a2c':
-            self.agent = A2C_ACKTR(
-                self.net,
-                cfg.agent.value_loss_coef,
-                cfg.agent.entropy_coef,
-                lr=cfg.agent.lr,
-                eps=cfg.agent.eps,
-                alpha=cfg.agent.alpha,
-                max_grad_norm=cfg.agent.max_grad_norm
-            )
-        elif cfg.agent.name == 'a2c_2am':
-            self.agent = A2C_2AM(
-                self.net,
-                cfg.agent.value_loss_coef,
-                cfg.agent.entropy_coef,
-                lr=cfg.agent.lr,
-                eps=cfg.agent.eps,
-                alpha=cfg.agent.alpha,
-                max_grad_norm=cfg.agent.max_grad_norm,
-                long_horizon=cfg.agent.long_horizon,
-                cognition_cost=cfg.agent.cognition_cost,
-                cognitive_coef=cfg.agent.cognition_coef,
-                only_action_values=cfg.agent.only_action_values,
-            )
-        elif cfg.agent.name == 'ppo':
-            self.agent = PPO(
-                self.net,
-                cfg.agent.clip_param,
-                cfg.agent.ppo_epoch,
-                cfg.agent.num_mini_batch,
-                cfg.agent.value_loss_coef,
-                cfg.agent.entropy_coef,
-                lr=cfg.agent.lr,
-                eps=cfg.agent.eps,
-                max_grad_norm=cfg.agent.max_grad_norm
-            )
-        elif cfg.agent.name == 'acktr':
-            self.agent = A2C_ACKTR(
-                self.net,
-                cfg.agent.value_loss_coef,
-                cfg.agent.entropy_coef,
-                acktr=True
-            )
-        else:
-            raise NameError
+        # init storage
+        self.buffer = TrickyRollout()
 
-        if self.cfg.agent.name == "a2c_2am":
-            self.rollouts = RolloutStorage2AM(
-                cfg.agent.num_steps,
-                cfg.num_envs,
-                self.env.observation_space.shape,
-                self.env.action_space,
-                self.net.recurrent_hidden_state_size
+        # init agent
+        if cfg.agent.name == 'a2c':
+            self.agent = A2C(
+                self.net,
+                self.buffer,
+                **self.cfg.agent.algo_params,
             )
         else:
-            self.rollouts = RolloutStorage(
-                cfg.agent.num_steps,
-                cfg.num_envs,
-                self.env.observation_space.shape,
-                self.env.action_space,
-                self.net.recurrent_hidden_state_size
-            )
-        self.rollouts.to(self.device)
+            raise NotImplementedError
 
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
-        self.step = 0
 
     def evaluate(self, step):
         eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
+        timeout_cnt = 0.0
         obs = self.eval_envs.reset()
-        eval_recurrent_hidden_states = torch.zeros(
-            1,
-            *np.atleast_1d(self.net.recurrent_hidden_state_size),
-            device=self.device
+        rnn_h = torch.zeros((self.eval_envs.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
+        done = torch.zeros((self.eval_envs.num_envs, 1)).to(self.device)
+        cog_policy = PolicyOutput(
+            value=None, action=torch.ones((self.eval_envs.num_envs, 1), device=self.device).long(),
+            action_log_probs=None, dist_entropy=None
         )
-        eval_masks = torch.zeros(1, 1, device=self.device)
-
         batched_obs_seq = []
-        self.video_recorder.init()
-        for i in range(50000):
-            if len(eval_episode_rewards) >= self.cfg.num_eval_episodes:
-                break
-            batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
-            # self.video_recorder.add_torch_obs(obs)
-            with torch.no_grad():
-                _, action, _, eval_recurrent_hidden_states = self.net.act(
-                    obs,
-                    eval_recurrent_hidden_states,
-                    eval_masks,
-                    # deterministic=True
-                )
-                # COG
-                if self.cfg.agent.name == "a2c_2am":
-                    action, action_cog = action
-                    action[action_cog == 0] = 127
+        while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
+            if len(self.env.observation_space.shape) == 3:
+                batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
 
-            # Obser reward and next obs
+            env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
+            value, action, _, _ = env_policy
+
+            pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
+            action = action * cog_policy.action + pause_action * (1 - cog_policy.action)
+
             obs, _, done, infos = self.eval_envs.step(action)
-
-            eval_masks = torch.tensor(
-                [[0.0] if done_ else [1.0] for done_ in done],
-                dtype=torch.float32,
-                device=self.device)
 
             for info in infos:
                 if 'episode' in info.keys():
                     eval_episode_rewards.append(info['episode']['r'])
-        self.video_recorder.capture(batched_obs_seq)
-        self.video_recorder.save(f'{step}.mp4')
+                    if 'TimeLimit.truncated' in info.keys():
+                        timeout_cnt += 1
 
-        return eval_episode_rewards
+        if len(self.env.observation_space.shape) == 3:
+            self.video_recorder.init()
+            self.video_recorder.capture(batched_obs_seq)
+            self.video_recorder.save(f'{step}.mp4')
+
+        timeout_fraction = timeout_cnt/self.cfg.num_eval_episodes
+        return eval_episode_rewards, timeout_fraction
 
     def run(self):
-        episode_rewards = deque(maxlen=30)
-        episode_rewards.append(-4)
-        timesteps_per_update = (self.cfg.agent.num_steps * self.cfg.num_envs * self.cfg.env.frame_skip)
-        num_updates = int(self.cfg.num_train_steps // timesteps_per_update)
-        total_episodes = 0
+        timesteps_cnt = 0
+        updates_cnt = 0
+        episodes_cnt = 0
+        episode_rewards = deque(maxlen=50)
+        episode_rewards.append(0)
+        timesteps_per_update = self.env.num_envs * self.cfg.env.frame_skip * self.cfg.agent.num_steps
 
-        obs = self.env.reset()
-        self.rollouts.obs[0].copy_(obs)
+        next_obs = self.env.reset()
+        rnn_h = torch.zeros((self.env.num_envs,) + self.net.recurrent_hidden_state_size(), device=self.device)
+        done = torch.zeros((self.env.num_envs, 1), device=self.device)
+        cog_policy = PolicyOutput(
+            value=None, action=torch.ones((self.env.num_envs, 1), device=self.device).long(),
+            action_log_probs=None, dist_entropy=None
+        )
 
-        timestep_count = 0
-        for j in range(num_updates):
-            self.step = j
+        while timesteps_cnt < self.cfg.num_timesteps:
             start_time = time.time()
-            for step in range(self.cfg.agent.num_steps):
-                timestep_count += self.cfg.num_envs * self.cfg.env.frame_skip
-                with torch.no_grad():
-                    value, action, action_log_prob, recurrent_hidden_states = self.net.act(
-                        self.rollouts.obs[step],
-                        self.rollouts.recurrent_hidden_states[step],
-                        self.rollouts.masks[step]
-                    )
-                if self.cfg.agent.name == "a2c_2am":
-                    value, value_cog = value
-                    action, action_cog = action
-                    n = self.cfg.agent.num_steps
-                    if (step + 1) % n == 0:
-                        action_cog.fill_(1)
-                    else:
-                        action_cog.fill_(1)
-                    action_log_prob, action_cog_log_prob = action_log_prob
-                    pausable_action = action.clone()
-                    pausable_action[action_cog == 0] = 127
-                    timestep_count -= (1-action_cog).sum()
-                    obs, reward, done, infos = self.env.step(pausable_action)
-                else:
-                    obs, reward, done, infos = self.env.step(action)
+            steps_since_update = 0
+            safety_cnt = 0
+
+            while steps_since_update < self.cfg.agent.num_steps * self.env.num_envs:
+                safety_cnt += 1
+                if safety_cnt > 2 * self.cfg.agent.num_steps * self.env.num_envs:
+                    break
+                obs = next_obs
+                env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
+                value, action, action_logp, action_entropy = env_policy
+
+                pause_action = torch.ones_like(action) * self.cfg.env.cognitive_pause
+                action = action * cog_policy.action + pause_action * (1 - cog_policy.action)
+
+                next_obs, reward, done, infos = self.env.step(action)
+                timeout = torch.FloatTensor([[1.0] if 'TimeLimit.truncated' in info.keys() else [0.0] for info in infos]).to(self.cfg.device)
+
                 for info in infos:
                     if 'episode' in info.keys():
                         episode_rewards.append(info['episode']['r'])
 
-                # If done then clean the history of observations.
-                masks = torch.FloatTensor(
-                    [[0.0] if done_ else [1.0] for done_ in done]
-                )
-                # total_episodes += (1 - masks).sum()
-                total_episodes += sum(done)
+                episodes_cnt += done.sum()
+                steps_since_update += cog_policy.action.sum()
+                self.buffer.append(obs, action, reward, done, timeout, rnn_h, value, action_logp, action_entropy)
+                self.buffer.append_cog(*cog_policy)
 
-                bad_masks = torch.FloatTensor(
-                    [[0.0] if 'TimeLimit.truncated' in info.keys() else [1.0]
-                     for info in infos]
-                )
-                # for info in infos:
-                #     if info:
-                #         print(info)
-
-                if self.cfg.agent.name == "a2c_2am":
-                    self.rollouts.insert(
-                        obs, recurrent_hidden_states, action,
-                        action_log_prob, value, reward, masks, bad_masks,
-                        action_cog, action_cog_log_prob, value_cog
-                    )
-                else:
-                    self.rollouts.insert(
-                        obs, recurrent_hidden_states, action,
-                        action_log_prob, value, reward, masks, bad_masks,
-                    )
-
-
+            timesteps_cnt += steps_since_update * self.cfg.env.frame_skip
             with torch.no_grad():
-                next_value = self.net.get_value(
-                    self.rollouts.obs[-1],
-                    self.rollouts.recurrent_hidden_states[-1],
-                    self.rollouts.masks[-1]
-                ).detach()
+                env_policy, cog_policy, _ = self.net(obs, rnn_h, done, cog_policy.action)
+                self.buffer.v.append(env_policy.value)
+                self.buffer.v_c.append(cog_policy.value)
 
-            self.rollouts.compute_returns(next_value, self.cfg.agent.use_gae, self.cfg.agent.gamma,
-                                     self.cfg.agent.gae_lambda, self.cfg.agent.use_proper_time_limits)
+            # value_loss, action_loss, entropy_loss = self.agent.update()  # non-cognitive working update
+            env_loss, cog_loss = self.agent.cognitive_update()
+            updates_cnt += 1
 
-            value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
-            if self.cfg.agent.name == "a2c_2am":
-                value_loss, value_cog_loss = value_loss
-                action_loss, action_cog_loss = action_loss
-                dist_entropy, dist_entropy_cog = dist_entropy
-
-            self.rollouts.after_update()
-
-            total_num_steps = (j + 1) * timesteps_per_update
-            if j != 0 \
-                    and j % (self.cfg.log_frequency_step // self.cfg.agent.num_steps) == 0 \
-                    and len(episode_rewards) > 0:
+            if (updates_cnt) % (1+self.cfg.log_timestep_interval//timesteps_per_update) == 0:
                 end_time = time.time()
-                self.logger.log("train/episode_reward", np.mean(episode_rewards), self.step)
-                self.logger.log('train/value', self.rollouts.value_preds.mean(), self.step)
-                self.logger.log('train/episode', total_episodes, self.step)
-                self.logger.log('train/timestep', timestep_count, self.step)
-                self.logger.log('train/duration', end_time - start_time, self.step)
-                self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), self.step)
-                self.logger.log('train_loss/critic', value_loss, self.step)
-                self.logger.log('train_loss/actor', action_loss, self.step)
-                self.logger.log('train_loss/entropy', dist_entropy, self.step)
-                if self.cfg.agent.name == "a2c_2am":
-                    self.logger.log('train/value_cog', self.rollouts.value_cog_preds.mean(), self.step)
-                    self.logger.log('train/act', self.rollouts.actions_cog.mean(), self.step)
-                    self.logger.log('train_loss/critic_cog', value_cog_loss, self.step)
-                    self.logger.log('train_loss/actor_cog', action_cog_loss, self.step)
-                    self.logger.log('train_loss/entropy_cog', dist_entropy_cog, self.step)
+                self.logger.log("train/episode_reward", np.mean(episode_rewards), updates_cnt)
+                self.logger.log('train/value', torch.stack(self.buffer.v).mean(), updates_cnt)
+                self.logger.log('train/episode', episodes_cnt, updates_cnt)
+                self.logger.log('train/timestep', timesteps_cnt, updates_cnt)
+                self.logger.log('train/duration', end_time - start_time, updates_cnt)
+                self.logger.log('train/fps', timesteps_per_update/(end_time - start_time), updates_cnt)
+                self.logger.log('train_loss/critic', env_loss.value, updates_cnt)
+                self.logger.log('train_loss/actor', env_loss.action, updates_cnt)
+                self.logger.log('train_loss/entropy', env_loss.entropy, updates_cnt)
+                if self.agent.twoAM:
+                    self.logger.log('train/value_cog', torch.stack(self.buffer.v_c).mean(), updates_cnt)
+                    self.logger.log('train/act', torch.stack(self.buffer.a_c).float().mean(), updates_cnt)
+                    self.logger.log('train_loss/critic_cog', cog_loss.value, updates_cnt)
+                    self.logger.log('train_loss/actor_cog', cog_loss.action, updates_cnt)
+                    self.logger.log('train_loss/entropy_cog', cog_loss.entropy, updates_cnt)
 
-                self.logger.dump(self.step)
+                self.logger.dump(updates_cnt)
 
-            # if j != 0\
-            if j % (self.cfg.eval_frequency_step // self.cfg.agent.num_steps) == 0\
-                    or j == num_updates-1:
-                eval_rewards = self.evaluate(total_num_steps)
-                self.logger.log("eval/episode_reward", np.mean(eval_rewards), total_num_steps)
-                self.logger.log('eval/episode', total_episodes, self.step)
-                self.logger.log('eval/timestep', total_num_steps, self.step)
-                self.logger.dump(self.step)
+            if (updates_cnt) % (1+self.cfg.eval_timestep_interval//timesteps_per_update) == 0:
+                with torch.no_grad():
+                    eval_rewards, eval_fraction_timeouts = self.evaluate(timesteps_cnt)
+                self.logger.log("eval/episode_reward", np.mean(eval_rewards), updates_cnt)
+                self.logger.log("eval/fraction_timeouts", eval_fraction_timeouts, updates_cnt)
+                self.logger.log("eval/timestep", timesteps_cnt, updates_cnt)
+                self.logger.dump(updates_cnt)
+
+            self.buffer.after_update()
+            rnn_h = rnn_h.detach()
+
+        return np.mean(episode_rewards)
 
 
-@hydra.main(config_path='configs/config.yaml', strict=True)
+@hydra.main(config_path='configs/', config_name='config')
 def main(cfg):
     workspace = Workspace(cfg)
-    print(cfg.pretty())
-    workspace.run()
+    # print(cfg.pretty())
+    mean_reward = workspace.run()
+    return float(mean_reward)
+
 
 
 if __name__ == '__main__':

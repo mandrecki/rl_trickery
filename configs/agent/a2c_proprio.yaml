@@ -7,7 +7,7 @@ network_params:
   architecture: "crnn"
   state_channels: 32
   hidden_size: 64
-  random_cog_fraction: 0.
+  random_cog_fraction: 0
   fixed_recursive_depth: 1
   append_a_cog: true
   append_coords: true
@@ -15,7 +15,7 @@ network_params:
 algo_params:
   twoAM: true
   cognition_coef: 1.0
-  cognition_cost: 0.1
+  cognition_cost: 0.2
   lr: 1e-3
   gamma: 0.99
   gamma_cog: 0.9
