@@ -165,7 +165,7 @@ class DimensionalityAdjuster(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, obs_space, hidden_size=512, state_channels=32):
+    def __init__(self, obs_space, hidden_size=512, state_channels=32, append_coords=False):
         super(Encoder, self).__init__()
         if obs_space.__class__.__name__ == "Discrete":
             self.out_shape = np.atleast_1d(hidden_size)
@@ -194,14 +194,16 @@ class Encoder(nn.Module):
                                        nn.init.calculate_gain('relu'))
             if im_size == 84:
                 self.net = nn.Sequential(
-                    init_relu(nn.Conv2d(n_channels, 32, 8, stride=4)), nn.ReLU(),
+                    CoordConv(obs_space.shape[-2:]) if append_coords else nn.Identity(),
+                    init_relu(nn.Conv2d(n_channels+3*int(append_coords), 32, 8, stride=4)), nn.ReLU(),
                     init_relu(nn.Conv2d(32, 64, 4, stride=2)), nn.ReLU(),
                     init_relu(nn.Conv2d(64, state_channels, 3, stride=1)), nn.ReLU(),
                 )
             elif im_size == 64:
                 self.net = nn.Sequential(
+                    CoordConv(obs_space.shape[-2:]) if append_coords else nn.Identity(),
                     # input (x, 64, 64)
-                    init_relu(nn.Conv2d(n_channels, 32, 6, stride=4, padding=1)), nn.ReLU(),
+                    init_relu(nn.Conv2d(n_channels+3*int(append_coords), 32, 6, stride=4, padding=1)), nn.ReLU(),
                     # input (3, 16, 16)
                     init_relu(nn.Conv2d(32, 64, 4, stride=2, padding=2)), nn.ReLU(),
                     # input (3, 9, 9)
@@ -211,7 +213,8 @@ class Encoder(nn.Module):
             # minipacman 15x19
             elif im_size == 15:
                 self.net = nn.Sequential(
-                    init_relu(nn.Conv2d(n_channels, 32, (5, 5), stride=1)), nn.ReLU(),
+                    CoordConv(obs_space.shape[-2:]) if append_coords else nn.Identity(),
+                    init_relu(nn.Conv2d(n_channels+3*int(append_coords), 32, (5, 5), stride=1)), nn.ReLU(),
                     init_relu(nn.Conv2d(32, 64, (3, 5), stride=1)), nn.ReLU(),
                     init_relu(nn.Conv2d(64, state_channels, (3, 5), stride=1)), nn.ReLU(),
                 )
@@ -281,7 +284,7 @@ class RecursivePolicy(nn.Module):
         self.is_recurrent = architecture in ["rnn", "crnn"]
         self.spatial_state_shape = (7, 7) if architecture == "crnn" else ()  # dictated by layer choice in encoder
 
-        self.encoder = Encoder(obs_space, hidden_size, state_channels)
+        self.encoder = Encoder(obs_space, hidden_size, state_channels, append_coords=append_coords)
 
         if architecture == "ff":
             self.transition = NoTransition(hidden_size)
