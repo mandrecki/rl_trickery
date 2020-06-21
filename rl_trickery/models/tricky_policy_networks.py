@@ -274,10 +274,12 @@ class RecursivePolicy(nn.Module):
             append_a_cog=False,
             append_coords=False,
             pool_and_inject=False,
+            detach_cognition=False,
     ):
         super(RecursivePolicy, self).__init__()
 
         self.twoAM = twoAM
+        self.detach_cog = detach_cognition
         self.random_cog_fraction = random_cog_fraction
         self.hidden_size = hidden_size
         self.architecture = architecture
@@ -380,7 +382,10 @@ class RecursivePolicy(nn.Module):
         else:
             # in_cog = torch.cat((in_ac_env.detach(), obs), dim=1).detach()
             # in_cog = torch.cat((x_trans, x_enc), dim=1).detach()
-            in_cog = self.trans2ac(x_trans)
+            if self.detach_cog:
+                in_cog = self.trans2ac(x_trans.detach())
+            else:
+                in_cog = self.trans2ac(x_trans)
             value_cog = self.ac_cog.forward_critic(in_cog)
             dist_cog = self.ac_cog.forward_actor(in_cog)
             # value_cog = self.ac_cog.forward_critic(in_ac_env.detach())

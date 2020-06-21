@@ -4,7 +4,7 @@ num_envs: 8
 num_steps: 10
 device: ${device}
 network_params:
-  architecture: "rnn"
+  architecture: "crnn"
   state_channels: 32
   hidden_size: 64
   random_cog_fraction: 0
@@ -12,10 +12,12 @@ network_params:
   append_a_cog: true
   append_coords: true
   pool_and_inject: false
+  detach_cognition: false
 algo_params:
   twoAM: true
-  cognition_coef: 1.0
-  cognition_cost: 0.003
+  cognitive_coef: 1.0
+  cognitive_cost: 0.1
+  cognitive_rewards: AD
   lr: 1e-3
   gamma: 0.99
   gamma_cog: 0.99

@@ -146,21 +146,23 @@ class A2C(object):
             max_grad_norm=None,
             use_timeout=True,
             gamma_cog=0.9,
-            cognition_cost=0.2,
-            cognition_coef=0.5,
+            cognitive_cost=0.2,
+            cognitive_coef=0.5,
             optimizer_type="RMSprop",
             smooth_value_loss=False,
             reward_rescale=False,
             update_cognitive_values=False,
             twoAM=False,
+            cognitive_rewards="AD"
     ):
         self.net = net
         self.buf = buffer
 
         self.twoAM = twoAM
         self.gamma_cog = gamma_cog
-        self.cognition_coef = cognition_coef
-        self.cognition_cost = cognition_cost
+        self.cognitive_rewards = cognitive_rewards
+        self.cognitive_coef = cognitive_coef
+        self.cognitive_cost = cognitive_cost
         self.update_cognitive_values = update_cognitive_values
         # self.long_horizon = long_horizon
         # self.only_action_values = only_action_values
@@ -248,7 +250,7 @@ class A2C(object):
 
         if self.twoAM:
             cog_loss = self.compute_cognitive_loss(full_adv.pow(2).detach(), a_loss_full.detach(), a_c)
-            total_loss += self.cognition_coef \
+            total_loss += self.cognitive_coef \
                           * (cog_loss.value * self.value_loss_coef
                              + cog_loss.action
                              - cog_loss.entropy * self.entropy_coef)
@@ -269,32 +271,28 @@ class A2C(object):
         value_accuracy = (torch.log2(env_value_loss[:-1, ...] + 1e-5) - torch.log2(env_value_loss[1:, ...] + 1e-5))
         action_improvement = -(env_action_loss[:-1, ...] - env_action_loss[1:, ...])
 
+        reward_cog = torch.zeros_like(a_c[:-1]).float()
+
         # punish cognition
-        reward_cog = -self.cognition_cost * (1 - a_c[:-1])
+        if "A" in self.cognitive_rewards.upper():
+            reward_cog += -self.cognitive_cost * (1 - a_c[:-1])
 
         # reward value accuracy improvement only in non-cognitive states
-        # reward_cog += value_accuracy * a_c[:-1]
+        if "B" in self.cognitive_rewards.upper():
+            reward_cog += value_accuracy * a_c[:-1]
 
         # reward value accuracy improvement only in cognitive states
-        # reward_cog += value_accuracy * (1 - a_c[:-1])
+        if "C" in self.cognitive_rewards.upper():
+            reward_cog += value_accuracy * (1 - a_c[:-1])
 
         # reward value accuracy improvement only in cognitive states followed by action state
-        reward_cog += value_accuracy * (1 - a_c[:-1]) * a_c[1:]
+        if "D" in self.cognitive_rewards.upper():
+            reward_cog += value_accuracy * (1 - a_c[:-1]) * a_c[1:]
 
         # reward action selection improvement
-        # reward_cog += action_improvement * a_c[:-1]
+        if "E" in self.cognitive_rewards.upper():
+            reward_cog += action_improvement * a_c[:-1]
 
-
-        # value_accuracy = env_advantages_squared[:-1, ...] - env_advantages_squared[1:, ...]
-        # reward_cog = (1 - a_c[:-1]) * (value_accuracy - self.cognition_cost)
-
-        # REWARD B
-        # if time flows, pay for error
-        # otherwise, pay constant cost
-
-        # REWARD C
-
-        # returns
         with torch.no_grad():
             cog_returns = compute_returns(
                 self.buf.v_c, reward_cog,
