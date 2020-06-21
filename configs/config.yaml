@@ -33,7 +33,7 @@ hydra:
   run:
     dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${name}
   sweep:
-    dir: ./multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}_${name}
+    dir: ./multirun/${now:%Y-%m-%d}/${name}_${now:%H-%M-%S}
     subdir: ${name}_${hydra.job.num}
 #  sweeper:
 #    params:
