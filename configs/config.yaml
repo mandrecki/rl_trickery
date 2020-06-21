@@ -9,22 +9,22 @@ log_timestep_interval: 1e2
 log_save_tb: true
 save_video: true
 eval_timestep_interval: 5e4
-num_eval_episodes: 32
+num_eval_episodes: 1
 num_eval_envs: ${env.num_eval_envs}
 
 defaults:
 #  - env: atari
-  - env: mazelab
+#  - env: mazelab
 #  - env: minipacman
-#  - env: cartpole
+  - env: cartpole
 #  - env: frozenlake
 #  - env: lunarlander
 #  - env: pixelcopter
 #  - env: minatar
 #  - env: snake
 #  - env: tetris
-  - agent: a2c_image
-#  - agent: a2c_proprio
+#  - agent: a2c_image
+  - agent: a2c_proprio
 #  - hydra/sweeper: nevergrad
 
 

@@ -236,7 +236,8 @@ class A2C(object):
             v_loss = adv[a_c == 1].mean()
 
         full_adv = (v_target - v).detach()
-        a_loss = -(full_adv[a_c == 1] * a_logp[a_c == 1]).mean()
+        a_loss_full = -(full_adv * a_logp)
+        a_loss = a_loss_full[a_c == 1].mean()
 
         env_loss = A2CLoss(
             value=v_loss,
@@ -246,7 +247,7 @@ class A2C(object):
         total_loss = env_loss.value * self.value_loss_coef + env_loss.action - env_loss.entropy * self.entropy_coef
 
         if self.twoAM:
-            cog_loss = self.compute_cognitive_loss(full_adv.pow(2), a_c)
+            cog_loss = self.compute_cognitive_loss(full_adv.pow(2).detach(), a_loss_full.detach(), a_c)
             total_loss += self.cognition_coef \
                           * (cog_loss.value * self.value_loss_coef
                              + cog_loss.action
@@ -260,12 +261,30 @@ class A2C(object):
 
         return env_loss, cog_loss
 
-    def compute_cognitive_loss(self, env_advantages_squared, a_c):
+    def compute_cognitive_loss(self, env_value_loss, env_action_loss, a_c):
         # REWARD A:
         # if time flows r=0
         # otherwise reward improvement in value estimate
         # always punish thinking with constant
-        value_accuracy = (torch.log2(env_advantages_squared[:-1, ...] + 1e-5) - torch.log2(env_advantages_squared[1:, ...] + 1e-5))
+        value_accuracy = (torch.log2(env_value_loss[:-1, ...] + 1e-5) - torch.log2(env_value_loss[1:, ...] + 1e-5))
+        action_improvement = -(env_action_loss[:-1, ...] - env_action_loss[1:, ...])
+
+        # punish cognition
+        reward_cog = -self.cognition_cost * (1 - a_c[:-1])
+
+        # reward value accuracy improvement only in non-cognitive states
+        # reward_cog += value_accuracy * a_c[:-1]
+
+        # reward value accuracy improvement only in cognitive states
+        # reward_cog += value_accuracy * (1 - a_c[:-1])
+
+        # reward value accuracy improvement only in cognitive states followed by action state
+        reward_cog += value_accuracy * (1 - a_c[:-1]) * a_c[1:]
+
+        # reward action selection improvement
+        # reward_cog += action_improvement * a_c[:-1]
+
+
         # value_accuracy = env_advantages_squared[:-1, ...] - env_advantages_squared[1:, ...]
         # reward_cog = (1 - a_c[:-1]) * (value_accuracy - self.cognition_cost)
 
@@ -274,7 +293,6 @@ class A2C(object):
         # otherwise, pay constant cost
 
         # REWARD C
-        reward_cog = value_accuracy * a_c[:-1] - self.cognition_cost * (1 - a_c[:-1])
 
         # returns
         with torch.no_grad():
