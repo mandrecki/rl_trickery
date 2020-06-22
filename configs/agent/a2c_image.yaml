@@ -13,10 +13,11 @@ network_params:
   append_coords: true
   pool_and_inject: false
   detach_cognition: false
+#  skip_transition_connection: false
 algo_params:
   twoAM: true
   cognitive_coef: 0.1
-  cognitive_cost: 0.05
+  cognitive_cost: 0.1
   cognitive_rewards: AD
   lr: 7e-4
   gamma: 0.99
@@ -29,5 +30,5 @@ algo_params:
   use_timeout: true
   smooth_value_loss: false
   reward_rescale: ${env.reward_rescale}
-  update_cognitive_values: true
-  optimizer_type: rmsprop
+  update_cognitive_values: false
+  optimizer_type: adam

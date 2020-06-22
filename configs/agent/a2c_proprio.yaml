@@ -16,7 +16,7 @@ network_params:
 algo_params:
   twoAM: true
   cognitive_coef: 1.0
-  cognitive_cost: 0.1
+  cognitive_cost: 0.0002
   cognitive_rewards: AD
   lr: 1e-3
   gamma: 0.99
