@@ -15,12 +15,12 @@ network_params:
   detach_cognition: false
 algo_params:
   twoAM: true
-  cognitive_coef: 1.0
-  cognitive_cost: 1.0
+  cognitive_coef: 0.1
+  cognitive_cost: 0.05
   cognitive_rewards: AD
   lr: 7e-4
   gamma: 0.99
-  gamma_cog: 0.95
+  gamma_cog: 0.99
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5
@@ -29,5 +29,5 @@ algo_params:
   use_timeout: true
   smooth_value_loss: false
   reward_rescale: ${env.reward_rescale}
-  update_cognitive_values: false
+  update_cognitive_values: true
   optimizer_type: rmsprop

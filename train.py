@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.backends.cudnn.benchmark = True
+# torch.backends.cudnn.benchmark = True
 
 import rl_trickery.envs
 import rl_trickery.utils.utils as utils
@@ -89,6 +89,7 @@ class Workspace(object):
     def evaluate(self, step):
         eval_episode_rewards = deque(maxlen=self.cfg.num_eval_episodes)
         timeout_cnt = 0.0
+        safety_cnt = 0
         obs = self.eval_envs.reset()
         rnn_h = torch.zeros((self.eval_envs.num_envs,) + self.net.recurrent_hidden_state_size()).to(self.device)
         done = torch.zeros((self.eval_envs.num_envs, 1)).to(self.device)
@@ -98,6 +99,10 @@ class Workspace(object):
         )
         batched_obs_seq = []
         while len(eval_episode_rewards) < self.cfg.num_eval_episodes:
+            safety_cnt += 1
+            if safety_cnt > 2000:
+                break
+
             if len(self.env.observation_space.shape) == 3:
                 batched_obs_seq.append((obs[:,:3].cpu().numpy()).astype("uint8"))
 

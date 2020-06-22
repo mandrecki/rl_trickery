@@ -4,7 +4,7 @@ num_envs: 8
 num_steps: 10
 device: ${device}
 network_params:
-  architecture: "crnn"
+  architecture: "rnn"
   state_channels: 32
   hidden_size: 64
   random_cog_fraction: 0
