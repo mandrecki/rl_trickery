@@ -31,4 +31,4 @@ algo_params:
   smooth_value_loss: false
   reward_rescale: ${env.reward_rescale}
   update_cognitive_values: false
-  optimizer_type: adam
+  optimizer_type: rmsprop

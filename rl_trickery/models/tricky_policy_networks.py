@@ -80,7 +80,7 @@ class RNNTransition(nn.Module):
         x = hxs
 
         if self.skip_connection:
-            torch.cat([x_in, x], dim=1)
+            x = torch.cat([x_in, x], dim=1)
 
         return x, hxs
 
@@ -169,11 +169,10 @@ class DimensionalityAdjuster(nn.Module):
                     nn.Identity()
                 )
             elif len(in_shape) == 1:
-                raise NotImplementedError
-                # self.net = nn.Sequential(
-                #     init_relu(nn.Linear(in_shape[0], out_shape[0])),
-                #     nn.ReLU()
-                # )
+                self.net = nn.Sequential(
+                    init_relu(nn.Linear(in_shape[0], out_shape[0])),
+                    nn.ReLU()
+                )
             else:
                 raise NotImplementedError
 
@@ -347,11 +346,9 @@ class RecursivePolicy(nn.Module):
         if self.twoAM:
             self.ac_cog = ActorCritic(
                 action_space=gym.spaces.Discrete(2),
-                # hidden_size=hidden_size + obs_space.shape[0]
                 hidden_size=hidden_size
             )
             self.trans2ac_cog = DimensionalityAdjuster(
-                # in_shape=(2*self.transition.out_shape[0],) + self.transition.out_shape[1:],
                 in_shape=self.transition.out_shape,
                 out_shape=self.ac_cog.in_shape
             )
