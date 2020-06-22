@@ -12,11 +12,11 @@ network_params:
   append_a_cog: true
   append_coords: true
   pool_and_inject: false
-  detach_cognition: false
+  detach_cognition: true
 algo_params:
   twoAM: true
-  cognitive_coef: 1.0
-  cognitive_cost: 0.0002
+  cognitive_coef: 0.1
+  cognitive_cost: 0.05
   cognitive_rewards: AD
   lr: 1e-3
   gamma: 0.99

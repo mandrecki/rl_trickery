@@ -311,7 +311,7 @@ class A2C(object):
 
         cog_loss = A2CLoss(
             value=adv.pow(2).mean(),
-            action=-(-adv.detach() * a_logp).mean(),
+            action=-(adv.detach() * a_logp).mean(),
             entropy=ent.mean()
         )
 

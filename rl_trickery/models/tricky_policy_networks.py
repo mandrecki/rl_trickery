@@ -48,15 +48,19 @@ class NoTransition(nn.Module):
 
 
 class RNNTransition(nn.Module):
-    def __init__(self, hidden_size, recurse_depth=1, append_a_cog=False):
+    def __init__(self, hidden_size, recurse_depth=1, append_a_cog=False, skip_connection=False):
         super(RNNTransition, self).__init__()
+        gru_in_size = hidden_size+int(append_a_cog)
         self.append_a_cog = append_a_cog
         self.recurse_depth = recurse_depth
+        self.skip_connection = skip_connection
         self.in_shape = (hidden_size,)
-        self.out_shape = (hidden_size,)
-        # self.in_shape += int(action_cog)
+        if self.skip_connection:
+            self.out_shape = (hidden_size+gru_in_size,)
+        else:
+            self.out_shape = (hidden_size,)
         self.recurrent_hidden_state_size = (hidden_size,)
-        self.gru = nn.GRUCell(hidden_size+int(append_a_cog), hidden_size, bias=True)
+        self.gru = nn.GRUCell(gru_in_size, hidden_size, bias=True)
         for name, param in self.gru.named_parameters():
             if 'bias' in name:
                 nn.init.constant_(param, 0)
@@ -65,31 +69,41 @@ class RNNTransition(nn.Module):
 
         assert recurse_depth >= 1
 
-    def forward(self, x, hxs, done, action_cog):
+    def forward(self, x_in, hxs, done, action_cog):
         if self.append_a_cog:
-            x = torch.cat((x, action_cog.float().detach()), dim=1)
+            x_in = torch.cat((x_in, action_cog.float().detach()), dim=1)
 
         hxs = hxs * (1 - done.view(-1, 1))
+        x = x_in
         for i in range(self.recurse_depth):
             hxs = self.gru(x, hxs)
         x = hxs
+
+        if self.skip_connection:
+            torch.cat([x_in, x], dim=1)
 
         return x, hxs
 
 
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False):
+    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False, skip_connection=False):
         super(CRNNTransition, self).__init__()
         self.append_a_cog = append_a_cog
         self.append_coords = append_coords
         self.pool_inject = pool_inject
         self.recurse_depth = recurse_depth
+        self.skip_connection = skip_connection
+
+        n_channels = state_channels + int(append_a_cog) + 3*int(append_coords)
         self.in_shape = (state_channels,) + spatial_shape
-        self.out_shape = (state_channels,) + spatial_shape
+
+        if self.skip_connection:
+            self.out_shape = (state_channels + n_channels,) + spatial_shape
+        else:
+            self.out_shape = (state_channels,) + spatial_shape
         self.state_channels = state_channels
         self.recurrent_hidden_state_size = (2*state_channels,) + spatial_shape
 
-        n_channels = state_channels + int(append_a_cog) + 3*int(append_coords)
         self.conv_lstm = ConvLSTMCell(
             input_dim=n_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
         )
@@ -122,6 +136,10 @@ class CRNNTransition(nn.Module):
 
         h, c = hxs
         hxs = torch.cat(hxs, dim=1)
+
+        if self.skip_connection:
+            h = torch.cat([x, h], dim=1)
+
         return h, hxs
 
 
@@ -275,6 +293,7 @@ class RecursivePolicy(nn.Module):
             append_coords=False,
             pool_and_inject=False,
             detach_cognition=False,
+            skip_connection=False,
     ):
         super(RecursivePolicy, self).__init__()
 
@@ -295,6 +314,7 @@ class RecursivePolicy(nn.Module):
                 hidden_size=hidden_size,
                 recurse_depth=fixed_recursive_depth,
                 append_a_cog=append_a_cog,
+                skip_connection=skip_connection,
             )
         elif architecture == "crnn":
             self.transition = CRNNTransition(
@@ -304,6 +324,7 @@ class RecursivePolicy(nn.Module):
                 append_a_cog=append_a_cog,
                 append_coords=append_coords,
                 pool_inject=pool_and_inject,
+                skip_connection=skip_connection,
             )
         else:
             raise NotImplementedError
@@ -394,7 +415,7 @@ class RecursivePolicy(nn.Module):
             # dist_cog = self.ac_cog.forward_actor(x)
             action_cog = dist_cog.sample()
 
-            action_cog_log_probs = dist_cog.log_probs(action)
+            action_cog_log_probs = dist_cog.log_probs(action_cog)
             dist_cog_entropy = dist_cog.entropy().unsqueeze(-1)
 
             cog_policy = PolicyOutput(
