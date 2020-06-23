@@ -2,9 +2,9 @@
 env_id: Mazelab-v0
 env_kwargs:
   maze_kind: maze
-  maze_size: 11
-  maze_fixed: true
-  goal_fixed: true
+  maze_size: 15
+  maze_fixed: false
+  goal_fixed: false
   goal_reward: false
   wall_reward: false
 max_timesteps: 250
@@ -23,4 +23,4 @@ random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
 num_eval_envs: 2
-num_timesteps: 75000
+num_timesteps: 2e7

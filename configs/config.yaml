@@ -5,10 +5,10 @@ num_envs: ${agent.num_envs}
 model_params_count: ???
 name: any
 
-log_timestep_interval: 1e2
+log_timestep_interval: 1e3
 log_save_tb: true
 save_video: true
-eval_timestep_interval: 5e4
+eval_timestep_interval: 5e5
 num_eval_episodes: 32
 num_eval_envs: ${env.num_eval_envs}
 

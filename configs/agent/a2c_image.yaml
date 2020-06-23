@@ -1,6 +1,6 @@
 # @package _group_
 name: a2c
-num_envs: 16
+num_envs: 64
 num_steps: 10
 device: ${device}
 network_params:
@@ -12,11 +12,11 @@ network_params:
   append_a_cog: true
   append_coords: true
   pool_and_inject: false
-  detach_cognition: false
-  skip_connection: false
+  detach_cognition: true
+  skip_connection: true
 algo_params:
   twoAM: true
-  cognitive_coef: 0.1
+  cognitive_coef: 1.0
   cognitive_cost: 0.1
   cognitive_rewards: AD
   lr: 7e-4
