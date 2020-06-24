@@ -199,6 +199,8 @@ class Workspace(object):
                     self.logger.log('train_loss/critic_cog', cog_loss.value, updates_cnt)
                     self.logger.log('train_loss/actor_cog', cog_loss.action, updates_cnt)
                     self.logger.log('train_loss/entropy_cog', cog_loss.entropy, updates_cnt)
+                else:
+                    self.logger.log('train/act', cog_policy.action.float().mean(), updates_cnt)
 
                 self.logger.dump(updates_cnt)
 

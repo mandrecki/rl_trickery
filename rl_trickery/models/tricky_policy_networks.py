@@ -48,9 +48,10 @@ class NoTransition(nn.Module):
 
 
 class RNNTransition(nn.Module):
-    def __init__(self, hidden_size, recurse_depth=1, append_a_cog=False, skip_connection=False):
+    def __init__(self, hidden_size, recurse_depth=1, append_a_cog=False, skip_connection=False, two_transitions=False):
         super(RNNTransition, self).__init__()
         gru_in_size = hidden_size+int(append_a_cog)
+        self.two_transitions = two_transitions
         self.append_a_cog = append_a_cog
         self.recurse_depth = recurse_depth
         self.skip_connection = skip_connection
@@ -67,9 +68,21 @@ class RNNTransition(nn.Module):
             elif 'weight' in name:
                 nn.init.orthogonal_(param)
 
+        if self.two_transitions:
+            assert not self.skip_connection
+            assert not self.append_a_cog
+            assert self.recurse_depth == 1
+
+            self.recurse_rnn = nn.GRUCell(gru_in_size, hidden_size, bias=True)
+            for name, param in self.recurse_rnn.named_parameters():
+                if 'bias' in name:
+                    nn.init.constant_(param, 0)
+                elif 'weight' in name:
+                    nn.init.orthogonal_(param)
+
         assert recurse_depth >= 1
 
-    def forward(self, x_in, hxs, done, action_cog):
+    def time_transition(self, x_in, hxs, done, action_cog):
         if self.append_a_cog:
             x_in = torch.cat((x_in, action_cog.float().detach()), dim=1)
 
@@ -84,12 +97,27 @@ class RNNTransition(nn.Module):
 
         return x, hxs
 
+    def recurse(self, x_in, hxs, done, action_cog):
+        hxs = self.recurse_rnn(x_in, hxs)
+        return hxs, hxs
+
+    def forward(self, x_in, hxs, done, action_cog):
+        x, hxs = self.time_transition(x_in, hxs, done, action_cog)
+
+        if self.two_transitions:
+            deep_x, deep_hxs = self.recurse(x_in, hxs, done, action_cog)
+            x = action_cog * x + (1 - action_cog) * deep_x
+            hxs = action_cog * hxs + (1 - action_cog) * deep_hxs
+
+        return x, hxs
+
 
 class CRNNTransition(nn.Module):
-    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False, skip_connection=False):
+    def __init__(self, state_channels, spatial_shape, recurse_depth=1, append_a_cog=False, append_coords=False, pool_inject=False, skip_connection=False, two_transitions=False):
         super(CRNNTransition, self).__init__()
         self.append_a_cog = append_a_cog
         self.append_coords = append_coords
+        self.two_transitions = two_transitions
         self.pool_inject = pool_inject
         self.recurse_depth = recurse_depth
         self.skip_connection = skip_connection
@@ -115,7 +143,25 @@ class CRNNTransition(nn.Module):
 
         assert recurse_depth >= 1
 
-    def forward(self, x, hxs, done, action_cog):
+        if self.two_transitions:
+            assert not self.skip_connection
+            assert not self.append_a_cog
+            assert not self.pool_inject
+            assert self.recurse_depth == 1
+
+            self.recurse_rnn = self.conv_lstm = ConvLSTMCell(
+                input_dim=n_channels, hidden_dim=state_channels, kernel_size=(3,3), bias=True,
+            )
+
+            for name, param in self.recurse_rnn.named_parameters():
+                if 'bias' in name:
+                    nn.init.constant_(param, 0)
+                elif 'weight' in name:
+                    nn.init.orthogonal_(param)
+
+        assert recurse_depth >= 1
+
+    def time_transition(self, x, hxs, done, action_cog):
         if self.pool_inject:
             x = self.pj_net(x)
 
@@ -141,6 +187,27 @@ class CRNNTransition(nn.Module):
             h = torch.cat([x, h], dim=1)
 
         return h, hxs
+
+    def recurse(self, x_in, hxs, done, action_cog):
+        hxs = hxs.split(self.state_channels, dim=1)
+        hxs = self.recurse_rnn(x_in, hxs)
+        h, c = hxs
+        hxs = torch.cat(hxs, dim=1)
+
+        return h, hxs
+
+    def forward(self, x_in, hxs, done, action_cog):
+        x, hxs = self.time_transition(x_in, hxs, done, action_cog)
+
+        if self.two_transitions:
+            deep_x, deep_hxs = self.recurse(x_in, hxs, done, action_cog)
+
+            expansion_dims = ((hxs.dim() - 1) * (1,))
+            ac_viewed = action_cog.view(-1, *expansion_dims)
+            x = ac_viewed * x + (1 - ac_viewed) * deep_x
+            hxs = ac_viewed * hxs + (1 - ac_viewed) * deep_hxs
+
+        return x, hxs
 
 
 class DimensionalityAdjuster(nn.Module):
@@ -293,6 +360,7 @@ class RecursivePolicy(nn.Module):
             pool_and_inject=False,
             detach_cognition=False,
             skip_connection=False,
+            two_transitions=False,
     ):
         super(RecursivePolicy, self).__init__()
 
@@ -314,6 +382,7 @@ class RecursivePolicy(nn.Module):
                 recurse_depth=fixed_recursive_depth,
                 append_a_cog=append_a_cog,
                 skip_connection=skip_connection,
+                two_transitions=two_transitions,
             )
         elif architecture == "crnn":
             self.transition = CRNNTransition(
@@ -324,6 +393,7 @@ class RecursivePolicy(nn.Module):
                 append_coords=append_coords,
                 pool_inject=pool_and_inject,
                 skip_connection=skip_connection,
+                two_transitions=two_transitions,
             )
         else:
             raise NotImplementedError

@@ -7,17 +7,18 @@ network_params:
   architecture: "rnn"
   state_channels: 32
   hidden_size: 64
-  random_cog_fraction: 0
+  random_cog_fraction: 0.8
   fixed_recursive_depth: 1
-  append_a_cog: true
-  append_coords: true
+  append_a_cog: false
+  append_coords: false
   pool_and_inject: false
-  detach_cognition: true
-  skip_connection: true
+  detach_cognition: false
+  skip_connection: false
+  two_transitions: true
 algo_params:
-  twoAM: true
-  cognitive_coef: 0.1
-  cognitive_cost: 0.05
+  twoAM: false
+  cognitive_coef: 1.0
+  cognitive_cost: 0.1
   cognitive_rewards: AD
   lr: 1e-3
   gamma: 0.99
@@ -30,5 +31,5 @@ algo_params:
   use_timeout: true
   smooth_value_loss: true
   reward_rescale: ${env.reward_rescale}
-  update_cognitive_values: true
+  update_cognitive_values: false
   optimizer_type: rmsprop
