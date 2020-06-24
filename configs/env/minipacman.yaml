@@ -1,6 +1,6 @@
 # @package _group_
-env_id: RegularMiniPacmanNoFrameskip-v0
-#env_id: AvoidMiniPacmanNoFrameskip-v0
+#env_id: RegularMiniPacmanNoFrameskip-v0
+env_id: AvoidMiniPacmanNoFrameskip-v0
 #env_id: HunMiniPacmanNoFrameskip-v0
 #env_id: AmbushMiniPacmanNoFrameskip-v0
 #env_id: RushMiniPacmanNoFrameskip-v0
@@ -19,3 +19,5 @@ frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
+num_eval_envs: 2
+num_timesteps: 1e6
