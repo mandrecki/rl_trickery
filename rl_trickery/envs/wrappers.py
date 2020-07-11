@@ -4,6 +4,8 @@ import cv2
 import torch
 from baselines.common.vec_env import VecEnvWrapper, VecEnvObservationWrapper
 from baselines.common.atari_wrappers import FireResetEnv, EpisodicLifeEnv, ClipRewardEnv, NoopResetEnv, MaxAndSkipEnv
+from enum import IntEnum
+from gym_minigrid.minigrid import MiniGridEnv
 
 
 def wrap_deepmind_modified(env, episode_life=False, clip_rewards=False, to_grayscale=False):
@@ -33,6 +35,35 @@ class ToImageObservation(gym.ObservationWrapper):
     def observation(self, symbolic_observation):
         image = self.render(mode='rgb_array')
         return image
+
+
+class AbsoluteActionGrid(gym.ActionWrapper):
+    class Actions(IntEnum):
+        # Turn left, turn right, move forward
+        right = 0
+        down = 1
+        left = 2
+        up = 3
+        # Done completing task
+        # done = 4
+
+    def __init__(self, env):
+        super(AbsoluteActionGrid, self).__init__(env)
+        self.actions = AbsoluteActionGrid.Actions
+
+        # Actions are discrete integer values
+        self.action_space = gym.spaces.Discrete(len(self.actions))
+
+    def action(self, action):
+        if action < 4:
+            # set agent's direction
+            self.unwrapped.agent_dir = action
+            action = MiniGridEnv.Actions.forward
+        # elif action == self.actions.done:
+        #     action = MiniGridEnv.Actions.done
+        else:
+            raise ValueError("Bad action: {}".format(action))
+        return action
 
 
 class CropImage(gym.ObservationWrapper):

@@ -1,27 +1,28 @@
 # @package _group_
 name: a2c
-num_envs: 32
+num_envs: 128
 num_steps: 10
 device: ${device}
 network_params:
-  architecture: "crnn"
+  architecture: "rnn"
   state_channels: 64
   hidden_size: 512
   random_cog_fraction: 0.0
-  fixed_recursive_depth: 1
-  append_a_cog: true
+  fixed_recursive_depth: 3
+  append_a_cog: false
   append_coords: true
   pool_and_inject: false
   detach_cognition: true
-  skip_connection: true
+  skip_connection: false
+  two_transitions: false
 algo_params:
-  twoAM: true
-  cognitive_coef: 1.0
+  twoAM: false
+  cognitive_coef: 0.99
   cognitive_cost: 0.1
-  cognitive_rewards: AD
+  cognitive_rewards: AC
   lr: 7e-4
   gamma: 0.99
-  gamma_cog: 0.99
+  gamma_cog: 0.9
   value_loss_coef: 0.5
   entropy_coef: 0.01
   eps: 1e-5
@@ -30,5 +31,5 @@ algo_params:
   use_timeout: true
   smooth_value_loss: false
   reward_rescale: ${env.reward_rescale}
-  update_cognitive_values: false
+  update_cognitive_values: true
   optimizer_type: rmsprop

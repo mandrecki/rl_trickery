@@ -14,7 +14,7 @@ episode_life: false
 reward_rescale: true
 clip_rewards: false
 cognitive_pause: 1337
-frame_stack: 1
+frame_stack: 2
 frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true

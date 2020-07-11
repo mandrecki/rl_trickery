@@ -1,7 +1,9 @@
 # @package _group_
-env_id: Freeway-MinAtar-v0
+env_id: MiniGrid-Dynamic-Obstacles-8x8-v0
+#env_id: MiniGrid-Dynamic-Obstacles-16x16-v0
+#env_id: MiniGrid-Dynamic-Obstacles-Random-6x6-v0
+
 env_kwargs: {}
-max_timesteps: 400
 obs_type: image
 image_size:
   - 64
@@ -11,10 +13,10 @@ episode_life: false
 clip_rewards: false
 reward_rescale: true
 cognitive_pause: 1337
-frame_stack: 4
+frame_stack: 1
 frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
 num_eval_envs: 4
-num_timesteps: 50e7
+num_timesteps: 2e6

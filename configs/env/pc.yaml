@@ -3,7 +3,6 @@ env_id: PixelCopter-v0
 env_kwargs:
   width: 64
   height: 64
-#max_timesteps: 1000
 obs_type: image
 image_size:
   - 64
@@ -18,3 +17,5 @@ frame_skip: 1
 random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
+num_eval_envs: 4
+num_timesteps: 2e6

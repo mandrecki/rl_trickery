@@ -6,9 +6,11 @@ import gym
 import gym_tetris
 import gym_ple
 import gym_minigrid
-# import gym_minipacman
-# import gym_minatar
-# import gym_pygame
+from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper, ImgObsWrapper
+
+import gym_minipacman
+import gym_minatar
+import gym_pygame
 from gym_tetris.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 from gym.wrappers import TimeLimit
@@ -29,11 +31,10 @@ ABSTRACT_ENVS = [
     "EmptyMazelab-v0",
 ]
 
-GYM_ENVS = [ "CartPole-v0",
+CONVERT_TO_IMAGE_ENVS = ["CartPole-v0",
     "Pendulum-v0", "MountainCar-v0", "Ant-v2", "HalfCheetah-v2", "HalfCheetah-v2", "Humanoid-v2",
     "HumanoidStandup-v2", "InvertedDoublePendulum-v2", "InvertedPendulum-v2", "Reacher-v2", "Swimmer-v2",
-    "Walker2d-v2"
-]
+    "Walker2d-v2"]
 
 DMC2_ENVS = [
     "cartpole-balance", "cartpole-swingup", "reacher-easy", "finger-spin", "cheetah-run",
@@ -75,8 +76,10 @@ def make_env(
         **kwargs
 ):
     env = gym.make(env_id, **env_kwargs)
-    if env_id in GYM_ENVS and obs_type == "image":
+    if (env_id in CONVERT_TO_IMAGE_ENVS) and obs_type == "image":
         env = ToImageObservation(env)
+    elif "MiniGrid" in env_id:
+        env = AbsoluteActionGrid(ImgObsWrapper(RGBImgObsWrapper(gym.make(env_id))))
     elif env_id in DMC2_ENVS:
         import dmc2gym
         domain_name, task_name = env_id.split("-")

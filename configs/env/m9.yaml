@@ -23,4 +23,4 @@ random_initial_steps: 0
 pytorch_dim_order: true
 device: ${device}
 num_eval_envs: 2
-num_timesteps: 1.25e6
+num_timesteps: 1.75e6

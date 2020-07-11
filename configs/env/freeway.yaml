@@ -18,4 +18,5 @@ max_timesteps: 1000
 pytorch_dim_order: true
 device: ${device}
 num_eval_envs: 4
-num_timesteps: 2e7
+num_timesteps: 20e7
+reward_rescale: true
