@@ -7,14 +7,14 @@ network_params:
   architecture: "rnn"
   state_channels: 32
   hidden_size: 64
-  random_cog_fraction: 0.8
+  random_cog_fraction: 0.0
   fixed_recursive_depth: 1
-  append_a_cog: false
+  append_a_cog: true
   append_coords: false
   pool_and_inject: false
-  detach_cognition: false
+  detach_cognition: true
   skip_connection: false
-  two_transitions: true
+  two_transitions: false
 algo_params:
   twoAM: false
   cognitive_coef: 1.0

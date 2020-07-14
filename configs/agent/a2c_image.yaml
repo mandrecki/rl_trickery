@@ -1,6 +1,6 @@
 # @package _group_
 name: a2c
-num_envs: 96
+num_envs: 64
 num_steps: 10
 device: ${device}
 network_params:
