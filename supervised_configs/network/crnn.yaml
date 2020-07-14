@@ -1,0 +1,3 @@
+# @package _group_
+architecture: crnn
+fixed_recursive_depth: 8

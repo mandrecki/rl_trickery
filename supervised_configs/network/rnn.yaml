@@ -1,0 +1,3 @@
+# @package _group_
+architecture: rnn
+fixed_recursive_depth: 5

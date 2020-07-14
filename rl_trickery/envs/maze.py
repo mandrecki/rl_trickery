@@ -9,6 +9,7 @@ from mazelab import VonNeumannMotion
 from mazelab import BaseMaze
 from mazelab import Object
 from mazelab.generators.random_maze import random_maze
+from mazelab.solvers.dijkstra_solver import dijkstra_solver, dijkstra_solver_full
 # from mazelab import DeepMindColor as BoardColor
 
 
@@ -164,3 +165,15 @@ class MazelabEnv(BaseEnv):
 
     def get_image(self):
         return self.maze.to_rgb()
+
+    def get_distance_to_goal(self):
+        current_position = self.maze.objects.agent.positions[0]
+        actions = dijkstra_solver(self.maze.board.astype("bool"), self.motions, current_position.flatten(), self.maze.goal.flatten())
+        distance = len(actions)
+        return distance
+
+    def get_distance_matrix(self):
+        current_position = self.maze.objects.agent.positions[0]
+        distances = dijkstra_solver_full(self.maze.board.astype("bool"), self.motions, current_position.flatten(), self.maze.goal.flatten())
+        distances[distances > 1000] = -1
+        return distances

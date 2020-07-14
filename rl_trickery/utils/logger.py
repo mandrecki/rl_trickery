@@ -13,8 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 COMMON_TRAIN_FORMAT = [
     ('episode', 'E', 'int'), ('step', 'S', 'int'), ('timestep', 'T', 'int'),
+    ('episode_reward', 'R', 'float'),
     ('fps', 'FPS', 'int'),
-    ('episode_reward', 'R', 'float')
     ]
 
 COMMON_EVAL_FORMAT = [
@@ -23,10 +23,8 @@ COMMON_EVAL_FORMAT = [
 ]
 
 AGENT_TRAIN_FORMAT = {
-    'a2c_old': [
-        ('value', 'CVALUE', 'float'),
-        # ('batch_return', 'BR', 'float'),
-        ('loss_actor', 'ALOSS', 'float'), ('loss_critic', 'CLOSS', 'float'), ('loss_entropy', 'AENT', 'float'),
+    'supervised_maze': [
+        ('out_var', 'VAR', 'float'),
     ],
     'a2c': [
         ('act', 'ACT', 'float'),
