@@ -16,7 +16,7 @@ torch.backends.cudnn.benchmark = True
 from rl_trickery.envs.maze import MazelabEnv
 from rl_trickery.envs.wrappers import ResizeImage, TransposeImage
 from rl_trickery.data.maze_storage import generate_dataset
-from rl_trickery.models.supervised_maze import MazeSolver
+from rl_trickery.models.supervised_maze import *
 import rl_trickery.utils.utils as utils
 from rl_trickery.utils.logger import Logger
 
@@ -45,11 +45,11 @@ class Workspace(object):
         # init envs
         env = MazelabEnv(maze_size=self.cfg.maze_size, maze_kind="maze", goal_fixed=False, maze_fixed=False, goal_reward=False,
                          wall_reward=False)
-        env = ResizeImage(env, (64, 64), antialias=True)
+        # env = ResizeImage(env, (64, 64), antialias=True)
         env = TransposeImage(env)
 
         self.dl_train = DataLoader(
-            generate_dataset(env, self.cfg.train_mazes),
+            generate_dataset(env, self.cfg.train_mazes, resize=False),
             batch_size=self.cfg.batch_size,
             shuffle=True,
             pin_memory=True,
@@ -57,7 +57,7 @@ class Workspace(object):
             drop_last=True
         )
         self.dl_eval = DataLoader(
-            generate_dataset(env, self.cfg.eval_mazes),
+            generate_dataset(env, self.cfg.eval_mazes, resize=False),
             batch_size=self.cfg.batch_size,
             shuffle=True,
             pin_memory=True,
@@ -66,9 +66,18 @@ class Workspace(object):
         )
 
         # init net
-        self.net = MazeSolver(
+        net_classes = {
+            "crnn": SeqSolverCRNN,
+            "rnn": SeqSolverRNN,
+            "muzero": SeqSolverMuZero,
+            "ff1": SeqSolverFF1,
+            "ff5": SeqSolverFF5,
+            "ff12": SeqSolverFF12,
+        }
+
+        net_class = net_classes[self.cfg.network]
+        self.net = net_class(
             env.observation_space,
-            **self.cfg.network
         )
         self.cfg.model_params_count = utils.get_n_params(self.net)
         print("Model params count:", self.cfg.model_params_count)
@@ -77,19 +86,16 @@ class Workspace(object):
 
     def evaluate(self):
         test_loss = 0
-        rnn_h = torch.zeros((self.cfg.batch_size,) + self.net.recurrent_hidden_state_size()).to(self.device)
-        done = torch.ones((self.cfg.batch_size, 1)).to(self.device)
         for i_batch, data in enumerate(self.dl_eval):
             x, y = data
-            y_hat, _ = self.net(x.cuda(), rnn_h, done)
-            test_loss += F.smooth_l1_loss(y_hat.cpu(), y)
+            y_hat = self.net(x.to(self.device), self.cfg.recurse)
+            y = y.repeat(y_hat.size(0), 1, 1).to(self.device)
+            test_loss += F.smooth_l1_loss(y_hat[-1], y[-1])
 
         test_loss /= i_batch + 1
         return test_loss
 
     def run(self):
-        rnn_h = torch.zeros((self.cfg.batch_size,) + self.net.recurrent_hidden_state_size()).to(self.device)
-        done = torch.ones((self.cfg.batch_size, 1)).to(self.device)
         opt = torch.optim.Adam(self.net.parameters(), lr=self.cfg.lr)
 
         updates_cnt = 0
@@ -100,21 +106,23 @@ class Workspace(object):
                 self.net.zero_grad()
 
                 x, y = data
-                y = y.cuda()
-                x = x.cuda()
+                y = y.to(self.device)
+                x = x.to(self.device)
 
-                y_hat, rnn_h = self.net(x, rnn_h.detach(), done)
-                loss = F.smooth_l1_loss(y_hat, y)
+                y_hat = self.net(x, self.cfg.recurse)
+                y = y.repeat(y_hat.size(0), 1, 1)
+                loss = F.smooth_l1_loss(y_hat[-5:], y[-5:])
+                report_loss = F.smooth_l1_loss(y_hat[-1], y[-1])
                 loss.backward()
                 opt.step()
-                total_loss += loss
+                total_loss += report_loss
                 updates_cnt += 1
 
             total_loss /= i_batch + 1
             # if updates_cnt % self.cfg.log_timestep_interval == 0:
             end_time = time.time()
             self.logger.log("train/episode_reward", total_loss, i_epoch)
-            self.logger.log("train/out_var", y_hat.var()/y.var(), i_epoch)
+            self.logger.log("train/out_var", y_hat[-1].var()/y[-1].var(), i_epoch)
             self.logger.log('train/duration', end_time - start_time, i_epoch)
             self.logger.log('train/fps', self.cfg.train_mazes/(end_time - start_time), i_epoch)
             self.logger.log('train/timestep', updates_cnt, i_epoch)

@@ -24,15 +24,15 @@ class ConvLSTMCell(nn.Module):
             bias=self.bias
         )
 
-    def forward(self, x, cur_state):
-        batch_size = x.shape[0]
-        im_size = x.shape[-2:]
+    def forward(self, input_tensor, cur_state):
+        batch_size = input_tensor.shape[0]
+        im_size = input_tensor.shape[-2:]
         if cur_state is not None:
             h_cur, c_cur = cur_state
         else:
             h_cur, c_cur = self.init_hidden(batch_size, im_size)
 
-        combined = torch.cat([x, h_cur], dim=1)  # concatenate along channel axis
+        combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
         combined_conv = self.conv(combined)
         cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
         i = torch.sigmoid(cc_i)

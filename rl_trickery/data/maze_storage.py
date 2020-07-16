@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from rl_trickery.envs.maze import Maze
 
 
-def generate_dataset(env, n):
+def generate_dataset(env, n, resize=True):
     boards = []
     distances = []
     goals = []
@@ -19,16 +19,17 @@ def generate_dataset(env, n):
     boards = np.stack(boards)
     distances = np.stack(distances)
     goals = np.stack(goals)
-    ds = MazeDataset(boards, distances, goals)
+    ds = MazeDataset(boards, distances, goals, resize)
     return ds
 
 
 class MazeDataset(Dataset):
-    def __init__(self, boards, distances, goals):
+    def __init__(self, boards, distances, goals, resize=True):
         super(MazeDataset, self).__init__()
         self.boards = boards
         self.distances = distances
         self.goals = goals
+        self.resize = resize
 
     def __len__(self):
         return len(self.boards)
@@ -46,8 +47,9 @@ class MazeDataset(Dataset):
         pos_x, pos_y = m.objects.agent.positions.T
 
         image = m.to_rgb()
-        image = self.add_padding(image)
-        image = cv2.resize(image, (64, 64), interpolation=cv2.INTER_NEAREST)
+        if self.resize:
+            image = self.add_padding(image)
+            image = cv2.resize(image, (64, 64), interpolation=cv2.INTER_NEAREST)
         image = image.transpose(2, 0, 1)
         image = torch.FloatTensor(image) / 255
 

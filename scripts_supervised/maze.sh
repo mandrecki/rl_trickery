@@ -1,4 +1,4 @@
 # base
-python train_supervised.py -m name=crnn \
-seed=0,0,0 \
-network.fixed_recursive_depth=int:1,4,8,12
+python train_supervised.py -m name=sup_maze15 \
+network=muzero,crnn,rnn,ff1,ff5,ff12 \
+maze_size=15,15,15 \

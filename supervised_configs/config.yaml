@@ -8,16 +8,19 @@ log_save_tb: true
 log_timestep_interval: 1e0
 eval_timestep_interval: 1e0
 
-train_mazes: 1e4
+train_mazes: 1e3
 eval_mazes: 1e3
 
 maze_size: 15
 batch_size: 16
 lr: 1e-3
 
-defaults:
-  - network: crnn
-  - hydra/sweeper: nevergrad
+recurse: 12
+network: crnn
+
+#defaults:
+#  - network: crnn
+#  - hydra/sweeper: nevergrad
 
 # hydra configuration
 hydra:
@@ -26,12 +29,12 @@ hydra:
   sweep:
     dir: ./multirun/${now:%Y-%m-%d}/${name}_${now:%H-%M-%S}
     subdir: ${name}_${hydra.job.num}
-  sweeper:
-    params:
-      optim:
-        optimizer: OnePlusOne
-        # total number of function evaluations to perform
-        budget: 20
-        # number of parallel workers for performing function evaluations
-        num_workers: 1
-        maximize: false
+#  sweeper:
+#    params:
+#      optim:
+#        optimizer: OnePlusOne
+#        # total number of function evaluations to perform
+#        budget: 20
+#        # number of parallel workers for performing function evaluations
+#        num_workers: 1
+#        maximize: false
