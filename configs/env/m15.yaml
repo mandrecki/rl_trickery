@@ -5,9 +5,9 @@ env_kwargs:
   maze_size: 15
   maze_fixed: false
   goal_fixed: false
-  goal_reward: false
+  goal_reward: true
   wall_reward: false
-max_timesteps: 250
+max_timesteps: 150
 obs_type: image
 image_size:
   - 64

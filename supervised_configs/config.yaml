@@ -1,5 +1,5 @@
 device: cuda:0
-epochs: 500
+epochs: 100
 seed: 0
 model_params_count: ???
 name: any
@@ -8,7 +8,7 @@ log_save_tb: true
 log_timestep_interval: 1e0
 eval_timestep_interval: 1e0
 
-train_mazes: 1e3
+train_mazes: 1e4
 eval_mazes: 1e3
 
 maze_size: 15

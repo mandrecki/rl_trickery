@@ -361,8 +361,14 @@ class RecursivePolicy(nn.Module):
             detach_cognition=False,
             skip_connection=False,
             two_transitions=False,
+            amnesia=False,
     ):
         super(RecursivePolicy, self).__init__()
+        self.amnesia = amnesia
+        if amnesia:
+            self.amnesia_multiplier = 0
+        else:
+            self.amnesia_multiplier = 1
 
         self.twoAM = twoAM
         self.detach_cog = detach_cognition
@@ -438,8 +444,9 @@ class RecursivePolicy(nn.Module):
 
     def forward(self, obs, rnn_h, done, a_cog=None):
         x = self.encoder(obs)
+
         x_enc = self.enc2trans(x)
-        x_trans, rnn_h = self.transition(x_enc, rnn_h, done, a_cog)
+        x_trans, rnn_h = self.transition(x_enc, rnn_h * self.amnesia_multiplier, done, a_cog)
         in_ac_env = self.trans2ac(x_trans)
         value = self.ac_env.forward_critic(in_ac_env)
         dist = self.ac_env.forward_actor(in_ac_env)
@@ -471,7 +478,7 @@ class RecursivePolicy(nn.Module):
             # in_cog = torch.cat((in_ac_env.detach(), obs), dim=1).detach()
             # in_cog = torch.cat((x_trans, x_enc), dim=1).detach()
             if self.detach_cog:
-                in_cog = self.trans2ac(x_trans.detach())
+                in_cog  = self.trans2ac(x_trans.detach())
             else:
                 in_cog = self.trans2ac(x_trans)
             value_cog = self.ac_cog.forward_critic(in_cog)

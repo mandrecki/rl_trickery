@@ -15,6 +15,7 @@ network_params:
   detach_cognition: true
   skip_connection: false
   two_transitions: false
+  amnesia: false
 algo_params:
   twoAM: false
   cognitive_coef: 0.99

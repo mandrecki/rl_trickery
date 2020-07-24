@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = False
 
 import rl_trickery.envs
 import rl_trickery.utils.utils as utils
@@ -150,8 +150,7 @@ class Workspace(object):
             safety_cnt = 0
 
             while steps_since_update < self.cfg.agent.num_steps * self.env.num_envs:
-                safety_cnt += 1
-                if safety_cnt > 2 * self.cfg.agent.num_steps * self.env.num_envs:
+                if safety_cnt >= 5 * self.cfg.agent.num_steps * self.env.num_envs:
                     break
                 obs = next_obs
                 env_policy, cog_policy, rnn_h = self.net(obs, rnn_h, done, cog_policy.action)
@@ -169,6 +168,7 @@ class Workspace(object):
 
                 episodes_cnt += done.sum()
                 steps_since_update += cog_policy.action.sum()
+                safety_cnt += self.env.num_envs
                 self.buffer.append(obs, action, reward, done, timeout, rnn_h, value, action_logp, action_entropy)
                 self.buffer.append_cog(*cog_policy)
 

@@ -251,9 +251,9 @@ class A2C(object):
         if self.twoAM:
             cog_loss = self.compute_cognitive_loss(full_adv.pow(2).detach(), a_loss_full.detach(), a_c)
             total_loss += self.cognitive_coef \
-                          * (cog_loss.value * self.value_loss_coef
+                          * (cog_loss.value * self.value_loss_coef * 0.1
                              + cog_loss.action
-                             - cog_loss.entropy * self.entropy_coef)
+                             - cog_loss.entropy * self.entropy_coef * 0.001)
         else:
             cog_loss = A2CLoss(value=0, action=0, entropy=0)
 
