@@ -5,7 +5,11 @@ import torch
 from baselines.common.vec_env import VecEnvWrapper, VecEnvObservationWrapper
 from baselines.common.atari_wrappers import FireResetEnv, EpisodicLifeEnv, ClipRewardEnv, NoopResetEnv, MaxAndSkipEnv
 from enum import IntEnum
-from gym_minigrid.minigrid import MiniGridEnv
+
+try:
+    from gym_minigrid.minigrid import MiniGridEnv
+except:
+    pass
 
 
 def wrap_deepmind_modified(env, episode_life=False, clip_rewards=False, to_grayscale=False):
