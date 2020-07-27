@@ -8,9 +8,9 @@ import gym_ple
 import gym_minigrid
 from gym_minigrid.wrappers import FullyObsWrapper, RGBImgObsWrapper, ImgObsWrapper
 
-import gym_minipacman
-import gym_minatar
-import gym_pygame
+# import gym_minipacman
+# import gym_minatar
+# import gym_pygame
 from gym_tetris.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 from gym.wrappers import TimeLimit

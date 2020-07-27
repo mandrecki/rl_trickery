@@ -9,7 +9,8 @@ from mazelab import VonNeumannMotion
 from mazelab import BaseMaze
 from mazelab import Object
 from mazelab.generators.random_maze import random_maze
-from mazelab.solvers.dijkstra_solver import dijkstra_solver, dijkstra_solver_full
+from mazelab.solvers.dijkstra_solver import dijkstra_solver
+# from mazelab.solvers.dijkstra_solver import dijkstra_solver_full
 # from mazelab import DeepMindColor as BoardColor
 
 
